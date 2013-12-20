@@ -316,4 +316,22 @@ function commerce_beanstream_payment_settings_form($settings = NULL) {
   return $form;
 }
 
+function commerce_beanstream_request($payment_method, $nvp = array()){
 
+  //get required beastream settings set on the payment method interface
+  $beanstream_url = $payment_method['setting']['payment_url'];
+  $beanstream_username = $payment_method['setting']['username'];
+  $beanstream_password = $payment_method['setting']['password'];
+  $beanstream_userpass = base64_encode($beanstream_username . ":" .  $beanstream_username);
+
+  //change the name value array to json for REST request
+  $request_json = json($nvp);
+
+  //prepare the header for the request
+  $headr = array(
+    'Content-type: application/json',
+    'Authorization: Basic ' . $beanstream_userpass,
+  );
+
+
+}
