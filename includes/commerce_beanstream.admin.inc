@@ -5,6 +5,9 @@ function commerce_beanstream_void_form($form, &$form_state, $order, $transaction
   $form_state['order'] = $order;
   $form_state['transaction'] = $transaction;
 
+// Load and store the payment method instance for this transaction.
+   $payment_method = commerce_payment_method_instance_load($transaction->instance_id);
+   $form_state['payment_method'] = $payment_method;
 
   $form['markup'] = array(
     '#markup' => t('Are you sure that you want to void this transaction?  '),
@@ -28,14 +31,22 @@ function commerce_beanstream_void_form($form, &$form_state, $order, $transaction
 function commerce_beanstream_void_form_submit($form, &$form_state) {
 
   $transaction = $form_state['transaction'];
-
- // dd($transaction, "TRANSACTION");
+  
 
   // Build a name-value pair array for this transaction.
-  $nvp = array(
-    'x_type' => 'VOID',
-    'x_trans_id' => $transaction->remote_id,
-  );
+  $request = array(
+    'trnType' => 'VP',
+    'trnOrderNumber' => $transaction->order_id,
+    'trnAmount' => number_format(commerce_currency_amount_to_decimal($transaction->amount,$transaction->currency_code),2),
+    'adjId' => $transaction->remote_id,
+  ); 
+//dd($request, 'VOID REQUEST');
+//dd($payment_method, 'FORM STATE PYMT METHOD');
+  $txnResponse = commerce_beanstream_request($form_state['payment_method'], $request);
+  parse_str($txnResponse, $response);
+
+  dd($response, 'VOID RESPONSE');
+
 
   // Submit the request to Authorize.Net.
 /*  $response = commerce_authnet_aim_request($form_state['payment_method'], $nvp);
