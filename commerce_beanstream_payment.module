@@ -97,7 +97,10 @@ function commerce_beanstream_payment_submit_form_validate($payment_method, $pane
 function commerce_beanstream_payment_submit_form_submit($payment_method, $pane_form, $pane_values, $order, $charge) {
   $order->data['commerce_beanstream_payment'] = $pane_values;
 
-  commerce_beanstream_payment_transaction($payment_method, $order, $charge, $pane_values);
+  $result = commerce_beanstream_payment_transaction($payment_method, $order, $charge, $pane_values);
+  if($result == FALSE) {
+    return FALSE;
+  }
 }
 
 /**
@@ -137,23 +140,23 @@ function commerce_beanstream_payment_transaction($payment_method, $order, $charg
 
   $txn_type = $payment_method['settings']['txn_type'];
 
-
   $request = array(
     'merchant_id' => $payment_method['settings']['merchant_ID'],
     'requestType' => 'BACKEND',
     'trnOrderNumber' => $order->order_id,
-    'trnAmount' => number_format(commerce_currency_amount_to_decimal($transaction->amount),2),
+    'trnAmount' => number_format(commerce_currency_amount_to_decimal($transaction->amount,$transaction->currency_code),2),
     'trnCardOwner' => $name_on_card,
     'trnCardNumber' => $card_number,
     'trnExpMonth' => $card_exp_month,
     'trnExpYear' => $card_exp_year,
     'trnType' => 'P', 
     'ordName' => $name_on_card,
-    'ordAddress' => $street_address,
+    'ordAddress1' => $street_address,
     'ordCity' => $city,
     'ordProvince' => $province,
     'ordCountry' => $country,
-    'ordEmail' => substr($order->mail, 0, 255),
+    'ordEmailAddress' => substr($order->mail, 0, 255),
+    'ordPostalCode' =>$postal,
   );
 
 
@@ -163,13 +166,7 @@ function commerce_beanstream_payment_transaction($payment_method, $order, $charg
   dd($response, 'Transaction Response');
 
   if($response['trnApproved'] != '1'  || empty($response['trnApproved'])){
-    dd('transaction failed', 'failure notice');
     $transaction->status = COMMERCE_PAYMENT_STATUS_FAILURE;
-    drupal_set_message(t('We received the folldowing error processing your card. Please enter your information again or try a different card.'), 'error');
-    drupal_set_message(t('We received the folldowing error processing your card. Please enter your information again or try a different card.'), 'error');
-    dd(check_plain($response['messageText']), 'error');
-    dd(check_plain($response['messageText']), 'error');
-    return FALSE;
   }else{
     // Set the transaction status based on the type of transaction this was.
       switch ($payment_method['settings']['txn_type']) {
@@ -183,21 +180,30 @@ function commerce_beanstream_payment_transaction($payment_method, $order, $charg
       }
       
       
-      $transaction->remote_id = $response['trnId'];
-      $transaction->remote_status = $response['paymentMethod']; 
-      $transaction->payload[REQUEST_TIME] = $response;
   }
+
+  
+ $transaction->remote_id = $response['trnId'];
+ $transaction->remote_status = $response['paymentMethod']; 
+ $transaction->payload[REQUEST_TIME] = $response;
 
  $message = 'Your transacton has been <b>' . $response['messageText'] . '</b>';
 
  $transaction->message = $message; 
 
 
- //dd($txResult, "FULL RESPONSE");
-  dd($transaction->status, "transaction status");
-  dd($transaction, "Transaction"); 
   commerce_payment_transaction_save($transaction);
+  
+   if($response['trnApproved'] != '1'){
+      drupal_set_message(t('We received the following error processing your card. Please enter your information again or try a different card.'), 'error');
+      drupal_set_message(check_plain($response['messageText']), 'error');
+      return FALSE;
+   }
+
+
   return $transaction;
+
+
  
 }
 
