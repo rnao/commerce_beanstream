@@ -12,7 +12,7 @@ function commerce_beanstream_payment_commerce_payment_method_info() {
     'title' => t('Beanstream Payment Method'),
     'short_title' => t('Beanstream'),
     'display_title' => t('Credit Card Beanstream'),
-    'description' => t('Beanstream credit card payment during checkout and serves as a development example.'),
+    'description' => t('Payment method for Beanstream.'),
     'active' => TRUE,
   );
 
@@ -20,9 +20,8 @@ function commerce_beanstream_payment_commerce_payment_method_info() {
 }
 
 function commerce_beanstream_payment_menu() {
-  
   $items = array();
-  // Add a menu item for voiding transactions.
+  /** Creates a menu for voiding transactions. */
   $items['admin/commerce/orders/%commerce_order/payment/%commerce_payment_transaction/beanstream-void'] = array(
     'title' => 'Void',
     'page callback' => 'drupal_get_form',
@@ -47,9 +46,9 @@ function commerce_beanstream_void_access($order, $transaction) {
 
   // Return FALSE if it is more than 24 hours since the last update to the
   // transaction, as it will already have been settled.
-  //todo:  change the hrs to 24, as you only have one day to void
-  if (time() - $transaction->changed > 2600 * 48) {
-   // return FALSE;
+
+  if (time() - $transaction->changed > 2600 * 24) {
+    return FALSE;
   }
 
   // Allow access if the user can update this transaction 
@@ -100,6 +99,7 @@ function commerce_beanstream_payment_submit_form_submit($payment_method, $pane_f
   $order->data['commerce_beanstream_payment'] = $pane_values;
 
   $result = commerce_beanstream_payment_transaction($payment_method, $order, $charge, $pane_values);
+  // if $result is equal to FALSE, the credit card has been declined - stop checkout and give user msg
   if($result == FALSE) {
     return FALSE;
   }
@@ -119,13 +119,14 @@ function commerce_beanstream_payment_submit_form_submit($payment_method, $pane_f
  */
 function commerce_beanstream_payment_transaction($payment_method, $order, $charge, $pane_values){
 
+  //transaction info
   $transaction = commerce_payment_transaction_new('commerce_beanstream_payment', $order->order_id);
   $transaction->instance_id = $payment_method['instance_id'];
   $transaction->amount = $charge['amount'];
   $transaction->currency_code = $charge['currency_code'];
   $transaction->message = 'Name: @name';
 
-
+  //get billing address
   $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
   $billing_address = $order_wrapper->commerce_customer_billing->commerce_customer_address->value();
   $name_on_card = $billing_address['name_line'];
@@ -137,6 +138,7 @@ function commerce_beanstream_payment_transaction($payment_method, $order, $charg
   $country = $billing_address['country'];
   $phone_number = $order_wrapper->commerce_customer_billing->field_phone_number->value();
 
+  //get shipping details
   $shipping_address = $order_wrapper->commerce_customer_shipping->commerce_customer_address->value();
   $ship_name_on_card = $shipping_address['name_line'];
   $ship_street_address = $shipping_address['thoroughfare'];
@@ -147,13 +149,16 @@ function commerce_beanstream_payment_transaction($payment_method, $order, $charg
   $ship_country = $shipping_address['country'];
   $ship_phone_number = $order_wrapper->commerce_customer_shipping->field_ship_phone_number->value();
 
+  //get credit card details
   $card_number = $pane_values['credit_card']['number'];
   $card_exp_month = $pane_values['credit_card']['exp_month'];
   $card_exp_year = substr($pane_values['credit_card']['exp_year'], -2);
   $card_code = $pane_values['credit_card']['code'];
 
+  //transaction type
   $txn_type = $payment_method['settings']['txn_type'];
 
+  //build the request
   $request = array(
     'merchant_id' => $payment_method['settings']['merchant_ID'],
     'requestType' => 'BACKEND',
@@ -184,12 +189,17 @@ function commerce_beanstream_payment_transaction($payment_method, $order, $charg
 
   );
 
+  //send request
   $txnResponse = commerce_beanstream_request($payment_method, $request);
+
+  //parse response string into variables
   parse_str($txnResponse, $response);
 
+  //if declined set the tranaction status to false
   if($response['trnApproved'] != '1'  || empty($response['trnApproved'])){
-    $transaction->status = COMMERCE_PAYMENT_STATUS_FAILURE;
+     $transaction->status = COMMERCE_PAYMENT_STATUS_FAILURE;
   }else{
+  //otheriwse set transaction status appropriately
     // Set the transaction status based on the type of transaction this was.
       switch ($payment_method['settings']['txn_type']) {
         case COMMERCE_CREDIT_AUTH_ONLY:
@@ -200,33 +210,30 @@ function commerce_beanstream_payment_transaction($payment_method, $order, $charg
           $transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
           break;
       }
-      
-      
   }
 
-  
+ //set tranaction variables to those returned from Beanstream
  $transaction->remote_id = $response['trnId'];
  $transaction->remote_status = $response['paymentMethod']; 
  $transaction->payload[REQUEST_TIME] = $response;
 
+ //set a msg to return to user
  $message = 'Your transacton has been <b>' . $response['messageText'] . '</b>';
 
  $transaction->message = $message; 
 
+ // save the transaction
+ commerce_payment_transaction_save($transaction);
 
-  commerce_payment_transaction_save($transaction);
-  
+ // if the transaction is declined return false send error to user
    if($response['trnApproved'] != '1'){
       drupal_set_message(t('We received the following error processing your card. Please enter your information again or try a different card.'), 'error');
       drupal_set_message(check_plain($response['messageText']), 'error');
       return FALSE;
    }
 
-
   return $transaction;
 
-
- 
 }
 
 /**
@@ -243,6 +250,7 @@ function commerce_beanstream_default_settings() {
     'txn_type' => COMMERCE_CREDIT_AUTH_CAPTURE,
   );
 }
+/** Create a settings form for the required Beanstream settings */
 
 function commerce_beanstream_payment_settings_form($settings = NULL) {
   module_load_include('inc', 'commerce_payment', 'includes/commerce_payment.credit_card');
@@ -302,6 +310,8 @@ function commerce_beanstream_payment_settings_form($settings = NULL) {
 
   return $form;
 }
+
+/** send transaction request to beanstream to process */
 
 function commerce_beanstream_request($payment_method, $request){
    $beanstream_url = $payment_method['settings']['payment_url'];
