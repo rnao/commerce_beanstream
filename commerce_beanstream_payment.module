@@ -26,7 +26,6 @@ function commerce_beanstream_payment_menu() {
     'title' => 'Void',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('commerce_beanstream_void_form', 3, 5),
-    'page arguments' => array('commerce_beanstream_void_form', 3, 5),
     'access callback' => 'commerce_beanstream_void_access',
     'access arguments' => array(3, 5),
     'type' => MENU_DEFAULT_LOCAL_TASK,
@@ -90,6 +89,7 @@ function commerce_beanstream_payment_submit_form_validate($payment_method, $pane
   if (!commerce_payment_credit_card_validate($pane_values['credit_card'], $settings)) {
     return FALSE;
   }
+
 }
 
 /**
@@ -136,7 +136,8 @@ function commerce_beanstream_payment_transaction($payment_method, $order, $charg
   $postal = $billing_address['postal_code'];
   $province = $billing_address['administrative_area'];
   $country = $billing_address['country'];
-  $phone_number = $order_wrapper->commerce_customer_billing->field_phone_number->value();
+  $phone_number_name = $payment_method['settings']['phone_field_name'];
+  $phone_number = $order_wrapper->commerce_customer_billing->$phone_number_name->value();
 
   //get shipping details
   $shipping_address = $order_wrapper->commerce_customer_shipping->commerce_customer_address->value();
@@ -147,16 +148,11 @@ function commerce_beanstream_payment_transaction($payment_method, $order, $charg
   $ship_postal = $shipping_address['postal_code'];
   $ship_province = $shipping_address['administrative_area'];
   $ship_country = $shipping_address['country'];
-  $ship_phone_number = $order_wrapper->commerce_customer_shipping->field_ship_phone_number->value();
 
   //get credit card details
   $card_number = $pane_values['credit_card']['number'];
   $card_exp_month = $pane_values['credit_card']['exp_month'];
   $card_exp_year = substr($pane_values['credit_card']['exp_year'], -2);
-  $card_code = $pane_values['credit_card']['code'];
-
-  //transaction type
-  $txn_type = $payment_method['settings']['txn_type'];
 
   //build the request
   $request = array(
@@ -185,8 +181,6 @@ function commerce_beanstream_payment_transaction($payment_method, $order, $charg
     'shipProvince' => $ship_province,
     'shipCountry' => $ship_country,
     'shipPostalCode' =>$ship_postal,
-    'shipPhoneNumber' =>$ship_phone_number,
-
   );
 
   //send request
@@ -245,6 +239,7 @@ function commerce_beanstream_default_settings() {
     'merchant_ID' => '',
     'username' => '',
     'password' => '',
+    'phone_field_name' => '',
     'method' => 'card',
     'card_types' => array(),
     'txn_type' => COMMERCE_CREDIT_AUTH_CAPTURE,
@@ -257,8 +252,17 @@ function commerce_beanstream_payment_settings_form($settings = NULL) {
 
   // Merge default settings into the stored settings array.
   $settings = (array) $settings + commerce_beanstream_default_settings();
-
   $form = array();
+
+  // Get the options for the phone fields to populate the possible phone fields availble
+  $phone_fields = field_read_fields(array('type' => 'phone'));
+  $phone_field_names = array();
+
+  foreach ($phone_fields as $phone_field){
+    $name = $phone_field['field_name'];
+    $phone_field_names[$name] = $name;
+  }
+
   $form['payment_url'] = array(
     '#type' => 'textfield',
     '#title' => t('Beanstream Payment URL'),
@@ -279,6 +283,14 @@ function commerce_beanstream_payment_settings_form($settings = NULL) {
     '#description' => t('Your username, created in the Beanstream customer interface.'),
     '#default_value' => $settings['username'],
     '#required' => TRUE,
+  );
+  $form['phone_field_name'] = array(
+    '#type' => 'select',
+    '#title' => t('Phone number field name'),
+    '#description' => t('Beanstream requires a phone number to process payments.  This module requires that you use the phone module (https://drupal.org/project/phone) to attach a phone field to the customer billing profile (http://yourdrupal/commerce/customer-profiles/types).  This select box lists all field names available of the phone type.  Select the one that you created for the profile.'),
+    '#default_value' => $settings['phone_field_name'],
+    '#required' => TRUE,
+    '#options' => $phone_field_names,
   );
   $form['password'] = array(
     '#type' => 'textfield',
@@ -330,7 +342,7 @@ function commerce_beanstream_request($payment_method, $request){
   curl_setopt($ch, CURLOPT_SSL_VERIFYHOST,0); curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0); 
   // Instruct curl to suppress the output from Online Mart, and to directly
   // return the transfer instead. (Output will be stored in $txResult.) 
-  curl_setopt( $ch, CURLOPT_RETURNTRANSFER, 1 );
+  curl_setopt( $ch, CURLOPT_RETURNTRANSFER, 1 ); 
   // This is the location of the Online Mart payment gateway
   curl_setopt( $ch, CURLOPT_URL, $beanstream_url);
   // These are the transaction parameters that we will POST 
