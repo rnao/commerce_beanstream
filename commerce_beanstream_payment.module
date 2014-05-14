@@ -257,7 +257,6 @@ function commerce_beanstream_payment_settings_form($settings = NULL) {
   // Get the options for the phone fields to populate the possible phone fields availble
   $phone_fields = field_read_fields(array('type' => 'phone'));
   $phone_field_names = array();
-
   foreach ($phone_fields as $phone_field){
     $name = $phone_field['field_name'];
     $phone_field_names[$name] = $name;
