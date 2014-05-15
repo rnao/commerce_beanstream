@@ -133,6 +133,7 @@ function commerce_beanstream_payment_transaction($payment_method, $order, $charg
       'trnAmount' => number_format(commerce_currency_amount_to_decimal($transaction->amount,$transaction->currency_code),2),
       'trnCardNumber' => $pane_values['credit_card']['number'],
       'trnExpMonth' => $pane_values['credit_card']['exp_month'],
+      'trnCardCvd' => $pane_values['credit_card']['code'],
       'trnExpYear' => substr($pane_values['credit_card']['exp_year'], -2),
       'trnType' => 'P',
   );
