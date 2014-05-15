@@ -147,7 +147,7 @@ function commerce_beanstream_payment_transaction($payment_method, $order, $charg
     $billing_request['trnCardOwner'] = $billing_request['ordName'] = $billing_address['name_line'];
     $billing_request['ordAddress1'] = $billing_address['thoroughfare'];
     $billing_request['ordAddress2'] = $billing_address['premise'];
-    $billing_request['city'] = $billing_address['locality'];
+    $billing_request['ordCity'] = $billing_address['locality'];
     $billing_request['ordPostalCode'] = $billing_address['postal_code'];
     $billing_request['ordProvince'] = $billing_address['administrative_area'];
     $billing_request['ordCountry'] = $billing_address['country'];
