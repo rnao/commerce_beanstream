@@ -137,10 +137,14 @@ function commerce_beanstream_payment_transaction($payment_method, $order, $charg
   $province = $billing_address['administrative_area'];
   $country = $billing_address['country'];
   $phone_number_name = $payment_method['settings']['phone_field_name'];
-  $phone_number = $order_wrapper->commerce_customer_billing->$phone_number_name->value();
 
+  if(isset($order_wrapper->commerce_customer_billing)){
+    $phone_number = $order_wrapper->commerce_customer_billing->$phone_number_name->value();
+  }
   //get shipping details
-  $shipping_address = $order_wrapper->commerce_customer_shipping->commerce_customer_address->value();
+  if(isset($order_wrapper->commerce_customer_shipping)){
+    $shipping_address = $order_wrapper->commerce_customer_shipping->commerce_customer_address->value();
+  }
   $ship_name_on_card = $shipping_address['name_line'];
   $ship_street_address = $shipping_address['thoroughfare'];
   $ship_street_address_2 = $shipping_address['premise'];
