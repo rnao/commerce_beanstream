@@ -144,15 +144,14 @@ function commerce_beanstream_payment_transaction($payment_method, $order, $charg
   //get shipping details
   if(isset($order_wrapper->commerce_customer_shipping)){
     $shipping_address = $order_wrapper->commerce_customer_shipping->commerce_customer_address->value();
+    $ship_name_on_card = $shipping_address['name_line'];
+    $ship_street_address = $shipping_address['thoroughfare'];
+    $ship_street_address_2 = $shipping_address['premise'];
+    $ship_city = $shipping_address['locality'];
+    $ship_postal = $shipping_address['postal_code'];
+    $ship_province = $shipping_address['administrative_area'];
+    $ship_country = $shipping_address['country'];
   }
-  $ship_name_on_card = $shipping_address['name_line'];
-  $ship_street_address = $shipping_address['thoroughfare'];
-  $ship_street_address_2 = $shipping_address['premise'];
-  $ship_city = $shipping_address['locality'];
-  $ship_postal = $shipping_address['postal_code'];
-  $ship_province = $shipping_address['administrative_area'];
-  $ship_country = $shipping_address['country'];
-
   //get credit card details
   $card_number = $pane_values['credit_card']['number'];
   $card_exp_month = $pane_values['credit_card']['exp_month'];
