@@ -90,6 +90,7 @@ function commerce_beanstream_payment_submit_form_validate($payment_method, $pane
     return FALSE;
   }
 
+  return TRUE;
 }
 
 /**
@@ -103,19 +104,22 @@ function commerce_beanstream_payment_submit_form_submit($payment_method, $pane_f
   if($result == FALSE) {
     return FALSE;
   }
+
+  return TRUE;
 }
 
 /**
  * Creates an example payment transaction for the specified charge amount.
  *
- * @param $payment_method
+ * @param Object $payment_method
  *   The payment method instance object used to charge this payment.
- * @param $order
+ * @param Object $order
  *   The order object the payment applies to.
- * @param $charge
+ * @param Array $charge
  *   An array indicating the amount and currency code to charge.
- * @param $name
- *   The name entered on the submission form.
+ * @param Array $pane_values
+ *   The array of pane values entered on the submission form.
+ * @return bool $transaction Object
  */
 function commerce_beanstream_payment_transaction($payment_method, $order, $charge, $pane_values){
   //transaction info
