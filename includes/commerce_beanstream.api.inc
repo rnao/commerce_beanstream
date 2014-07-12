@@ -1,4 +1,8 @@
 <?php
+
+define(COMMERCE_BEANSTREAM_PAYMENT_URL, 'https://www.beanstream.com/scripts/process_transaction.asp');//SOAP URL https://www.beanstream.com/api/v1/payments
+define(COMMERCE_BEANSTREAM_PAYMENT_PROFILE_URL, 'https://www.beanstream.com/scripts/payment_profile.asp');
+
 /**
  * Creates an example payment transaction for the specified charge amount.
  *

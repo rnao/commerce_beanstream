@@ -159,8 +159,8 @@ function commerce_beanstream_payment_cardonfile_submit($payment_method, $pane_fo
  */
 function commerce_beanstream_default_settings() {
   return array(
-    'payment_url' => 'https://www.beanstream.com/scripts/process_transaction.asp', //SOAP URL https://www.beanstream.com/api/v1/payments
-    'payment_profile_url' => 'https://www.beanstream.com/scripts/payment_profile.asp',
+    'payment_url' => COMMERCE_BEANSTREAM_PAYMENT_URL,
+    'payment_profile_url' => COMMERCE_BEANSTREAM_PAYMENT_PROFILE_URL,
     'merchant_ID' => '',
     'username' => '',
     'password' => '',
