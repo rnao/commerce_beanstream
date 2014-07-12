@@ -2,6 +2,8 @@
 
 /** this module was adapted from the authorize.net payment method module and the commerce payment method example */
 
+
+
 /**
  * Implements hook_commerce_payment_method_info().
  */
@@ -9,11 +11,16 @@ function commerce_beanstream_payment_commerce_payment_method_info() {
   $payment_methods = array();
 
   $payment_methods['commerce_beanstream_payment'] = array(
+    'active' => TRUE,
     'title' => t('Beanstream Payment Method'),
     'short_title' => t('Beanstream'),
     'display_title' => t('Credit Card Beanstream'),
     'description' => t('Payment method for Beanstream.'),
-    'active' => TRUE,
+    'cardonfile' => array(
+      'charge callback' => 'commerce_beanstream_cardonfile_charge',
+      'update callback' => 'commerce_beanstream_cardonfile_update',
+      'delete callback' => 'commerce_beanstream_cardonfile_delete',
+    ),
   );
 
   return $payment_methods;
@@ -80,6 +87,12 @@ function commerce_beanstream_payment_submit_form($payment_method, $pane_values, 
  * Payment method callback: submit form validation.
  */
 function commerce_beanstream_payment_submit_form_validate($payment_method, $pane_form, $pane_values, $order, $form_parents = array()) {
+  // If the customer specified a card on file, skip the normal validation.
+  if (module_exists('commerce_cardonfile') && !empty($payment_method['settings']['cardonfile']) &&
+    !empty($pane_values['cardonfile']) && $pane_values['cardonfile'] !== 'new') {
+    return;
+  }
+
   // Validate the credit card fields.
   module_load_include('inc', 'commerce_payment', 'includes/commerce_payment.credit_card');
   $settings = array(
@@ -97,15 +110,44 @@ function commerce_beanstream_payment_submit_form_validate($payment_method, $pane
  * Payment method callback: submit form submission.
  */
 function commerce_beanstream_payment_submit_form_submit($payment_method, $pane_form, $pane_values, $order, $charge) {
-  $order->data['commerce_beanstream_payment'] = $pane_values;
+  // If the customer specified payment using a card on file, attempt that now
+  // and simply return the result.
+  if (module_exists('commerce_cardonfile') && $payment_method['settings']['cardonfile'] &&
+    !empty($pane_values['cardonfile'])) {
 
-  $result = commerce_beanstream_payment_transaction($payment_method, $order, $charge, $pane_values);
-  // if $result is equal to FALSE, the credit card has been declined - stop checkout and give user msg
-  if($result == FALSE) {
+   if ($pane_values['cardonfile'] === 'new') {
+     // Create a new profile, and then run the transaction
+     
+   } else {
+     // Use an existing profile
+     return commerce_beanstream_payment_cardonfile_submit($payment_method, $pane_form, $pane_values, $order, $charge);
+   }
+
+  } else {
+
+    $order->data['commerce_beanstream_payment'] = $pane_values;
+
+    $result = commerce_beanstream_payment_transaction($payment_method, $order, $charge, $pane_values);
+    // if $result is equal to FALSE, the credit card has been declined - stop checkout and give user msg
+    if($result == FALSE) {
+      return FALSE;
+    }
+
+    return TRUE;
+  }
+}
+
+function commerce_beanstream_payment_cardonfile_submit($payment_method, $pane_form, $pane_values, $order, $charge) {
+  // First attempt to load the card on file.
+  $card_data = commerce_cardonfile_load($pane_values['cardonfile']);
+
+  // Fail now if it is no longer available or the card is inactive.
+  if (empty($card_data) || $card_data->status == 0) {
+    drupal_set_message(t('The requested card on file is no longer valid.'), 'error');
     return FALSE;
   }
 
-  return TRUE;
+  return commerce_beanstream_cardonfile_charge($payment_method, $card_data, $order, $charge);
 }
 
 /**
@@ -233,6 +275,7 @@ function commerce_beanstream_payment_transaction($payment_method, $order, $charg
 function commerce_beanstream_default_settings() {
   return array(
     'payment_url' => 'https://www.beanstream.com/scripts/process_transaction.asp', //SOAP URL https://www.beanstream.com/api/v1/payments
+    'payment_profile_url' => 'https://www.beanstream.com/scripts/payment_profile.asp',
     'merchant_ID' => '',
     'username' => '',
     'password' => '',
@@ -314,7 +357,21 @@ function commerce_beanstream_payment_settings_form($settings = NULL) {
   );
 
 
-
+  // Secure Payment Profile support in conjunction with Beanstream requires the Card on File module.
+  if (module_exists('commerce_cardonfile')) {
+    $form['cardonfile'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Enable Card on File functionality with this payment method using Beanstream Secure Payment Profiles.'),
+      '#description' => t('This allows the use of Secure Payment Profiles to store Card information at Beanstream.'),
+      '#default_value' => $settings['cardonfile'],
+    );
+  }
+  else {
+    $form['cardonfile'] = array(
+      '#type' => 'markup',
+      '#markup' => t('To enable Card on File funcitionality download and install the Card on File module.'),
+    );
+  }
 
   return $form;
 }
@@ -354,3 +411,76 @@ function commerce_beanstream_request($payment_method, $request){
   return $txResult;
   // Make the response an array and trim off the encapsulating characters.
 }
+
+/**
+ * Card on file callback: background charge payment
+ *
+ * @param object $payment_method
+ *  The payment method instance definition array.
+ * @param object $card_data
+ *   The stored credit card data array to be processed
+ * @param object $order
+ *   The order object that is being processed
+ * @param array $charge
+ *   The price array for the charge amount with keys of 'amount' and 'currency'
+ *   If null the total value of the order is used.
+ *
+ * @return void TRUE if the transaction was successful
+ */
+function commerce_beanstream_cardonfile_charge($payment_method, $card_data, $order, $charge = NULL) {
+  // Format order total for transaction.
+  if (!isset($charge)) {
+    $wrapper = entity_metadata_wrapper('commerce_order', $order);
+    $charge = commerce_line_items_total($wrapper->commerce_line_items);
+  }
+
+  //transaction info
+  $transaction = commerce_payment_transaction_new('commerce_beanstream_payment', $order->order_id);
+  $transaction->instance_id = $payment_method['instance_id'];
+  $transaction->amount = $charge['amount'];
+  $transaction->currency_code = $charge['currency_code'];
+  $transaction->message = 'Name: @name';
+
+  //build the request
+  $request = array(
+    'merchant_id' => $payment_method['settings']['merchant_ID'],
+    'requestType' => 'BACKEND',
+    'trnOrderNumber' => $order->order_id,
+    'trnAmount' => number_format(commerce_currency_amount_to_decimal($transaction->amount,$transaction->currency_code),2),
+    'trnCardNumber' => $pane_values['credit_card']['number'],
+    'trnExpMonth' => $pane_values['credit_card']['exp_month'],
+    'trnCardCvd' => $pane_values['credit_card']['code'],
+    'trnExpYear' => substr($pane_values['credit_card']['exp_year'], -2),
+    'trnType' => 'P',
+  );
+
+}
+
+/**
+ * Card on file callback: update card information
+ *
+ * @param array $form
+ *   The payment form
+ * @param array $form_state
+ *   The payment form state
+ * @param object $payment_method
+ *   The payment method instance definition array
+ * @param object $card_data
+ *   The new credit card data array to be processed
+ */
+function commerce_beanstream_cardonfile_update($form, &$form_state, $payment_method, $card_data){}
+
+/**
+ * Card on file callback: delete card information
+ *
+ * @param array $form
+ *   The payment form
+ * @param array $form_state
+ *   The payment form state
+ * @param object $payment_method
+ *   The payment method instance definition array
+ * @param object $card_data
+ *   The credit card data to be deleted
+ */
+function commerce_beanstream_cardonfile_delete($form, &$form_state, $payment_method, $card_data){}
+
