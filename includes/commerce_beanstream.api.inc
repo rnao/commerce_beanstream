@@ -73,13 +73,8 @@ function commerce_beanstream_payment_transaction($payment_method, $order, $charg
     $request = array_merge($request, $shipping_request);
   }
 
-
-
   //send request
-  $txnResponse = commerce_beanstream_request($payment_method, $request);
-
-  //parse response string into variables
-  parse_str($txnResponse, $response);
+  $response = commerce_beanstream_request($payment_method, $request);
 
   //if declined set the tranaction status to false
   if($response['trnApproved'] != '1'  || empty($response['trnApproved'])){
@@ -127,33 +122,52 @@ function commerce_beanstream_request($payment_method, $request){
    $beanstream_url = $payment_method['settings']['payment_url'];
 
    $request += array(
-      'username' => $payment_method['settings']['username'],
-      'password' => $payment_method['settings']['password'],
-      'merchant_id' => $payment_method['settings']['merchant_ID'],
-      'requestType' => 'BACKEND',
+     'username' => $payment_method['settings']['username'],
+     'password' => $payment_method['settings']['password'],
+     'merchant_id' => $payment_method['settings']['merchant_ID'],
+     'requestType' => 'BACKEND',
+     'responseFormat' => 'QS', // QueryString format responses
     );
 
-  // Initialize curl
-  $ch = curl_init();
-  // Get curl to POST
-  curl_setopt( $ch, CURLOPT_POST, 1 );
-  curl_setopt($ch, CURLOPT_SSL_VERIFYHOST,0); curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
+  return _commerce_beanstream_payment_curl($beanstream_url, $request);
+}
+
+/**
+ * Helper function to POST data to Beanstream URL using CURL
+ *
+ * @param string $url
+ * @param array $data
+ * @return bool|mixed Result of the transaction, or FALSE on error.
+ */
+function _commerce_beanstream_payment_curl($url, $data) {
+
+  $ch = curl_init();                           // Initialize curl
+  curl_setopt( $ch, CURLOPT_POST, 1 );         // Get curl to POST
+  curl_setopt($ch, CURLOPT_SSL_VERIFYHOST,0);  // Disable SSL checks
+  curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
+  curl_setopt( $ch, CURLOPT_URL, $url);        // This is the location of the Online Mart payment gateway
+
   // Instruct curl to suppress the output from Online Mart, and to directly
   // return the transfer instead. (Output will be stored in $txResult.)
   curl_setopt( $ch, CURLOPT_RETURNTRANSFER, 1 );
-  // This is the location of the Online Mart payment gateway
-  curl_setopt( $ch, CURLOPT_URL, $beanstream_url);
+
   // These are the transaction parameters that we will POST
-  curl_setopt( $ch, CURLOPT_POSTFIELDS,http_build_query($request));
-// Now POST the transaction. $txResult will contain Online Mart's response
-  $txResult = curl_exec( $ch );
+  curl_setopt( $ch, CURLOPT_POSTFIELDS,http_build_query($data));
+
+  // Now POST the transaction. $txResult will contain Online Mart's response
+  $txResult = curl_exec($ch);
+
   // Log any errors to the watchdog.
   if ($error = curl_error($ch)) {
     watchdog('commerce_beamstream_payment', 'cURL error: @error', array('@error' => $error), WATCHDOG_ERROR);
     return FALSE;
   }
   curl_close( $ch );
-  return $txResult;
-  // Make the response an array and trim off the encapsulating characters.
+
+  //parse response string into variables
+  parse_str($txResult, $response);
+
+  return $response;
+  // TODO? Make the response an array and trim off the encapsulating characters.
 }
 

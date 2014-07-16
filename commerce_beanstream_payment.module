@@ -3,8 +3,8 @@
 /** this module was adapted from the authorize.net payment method module and the commerce payment method example */
 
 
-require_once('includes/commerce_beanstream.api.inc');
-require_once('includes/commerce_beanstream.cardonfile.callbacks.inc');
+require_once(drupal_get_path('module','commerce_beanstream_payment').'/includes/commerce_beanstream.api.inc');
+require_once(drupal_get_path('module','commerce_beanstream_payment').'/includes/commerce_beanstream.cardonfile.callbacks.inc');
 
 /**
  * Implements hook_commerce_payment_method_info().
@@ -16,7 +16,7 @@ function commerce_beanstream_payment_commerce_payment_method_info() {
     'active' => TRUE,
     'title' => t('Beanstream Payment Method'),
     'short_title' => t('Beanstream'),
-    'display_title' => t('Credit Card Beanstream'),
+    'display_title' => t('Credit Card'),
     'description' => t('Payment method for Beanstream.'),
     'cardonfile' => array(
       'charge callback' => 'commerce_beanstream_cardonfile_charge',
@@ -208,6 +208,13 @@ function commerce_beanstream_payment_settings_form($settings = NULL) {
     '#default_value' => $settings['username'],
     '#required' => TRUE,
   );
+  $form['password'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Password'),
+    '#description' => t('Your password, created in the Beanstream customer interface.'),
+    '#default_value' => $settings['password'],
+    '#required' => TRUE,
+  );
   $form['phone_field_name'] = array(
     '#type' => 'select',
     '#title' => t('Phone number field name'),
@@ -215,13 +222,6 @@ function commerce_beanstream_payment_settings_form($settings = NULL) {
     '#default_value' => $settings['phone_field_name'],
     '#required' => TRUE,
     '#options' => $phone_field_names,
-  );
-  $form['password'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Password'),
-    '#description' => t('Your password, created in the Beanstream customer interface.'),
-    '#default_value' => $settings['password'],
-    '#required' => TRUE,
   );
   $form['card_types'] = array(
     '#type' => 'checkboxes',
