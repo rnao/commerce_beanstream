@@ -1,7 +1,99 @@
 <?php
 
-define(COMMERCE_BEANSTREAM_PAYMENT_URL, 'https://www.beanstream.com/scripts/process_transaction.asp');//SOAP URL https://www.beanstream.com/api/v1/payments
-define(COMMERCE_BEANSTREAM_PAYMENT_PROFILE_URL, 'https://www.beanstream.com/scripts/payment_profile.asp');
+define('COMMERCE_BEANSTREAM_PAYMENT_URL', 'https://www.beanstream.com/scripts/process_transaction.asp');//SOAP URL https://www.beanstream.com/api/v1/payments
+define('COMMERCE_BEANSTREAM_PAYMENT_PROFILE_URL', 'https://www.beanstream.com/scripts/payment_profile.asp');
+
+function _commerce_beanstream_payment_create_profile($payment_method, $order, $pane_form, $pane_values, $billing) {
+  // Determine the credit card type if possible for use in later code.
+  if (!empty($pane_values['credit_card']['number'])) {
+    module_load_include('inc', 'commerce_payment', 'includes/commerce_payment.credit_card');
+    $card_type = commerce_payment_validate_credit_card_type($pane_values['credit_card']['number'], array_keys(commerce_payment_credit_card_types()));
+  }
+
+  $billing_address = $billing->commerce_customer_address->value();
+
+  // Setup new Card entity
+  $card = commerce_cardonfile_new();
+  $card->uid = $order->uid;
+  $card->payment_method = $payment_method['method_id'];
+  $card->instance_id = $payment_method['instance_id'];
+  $card->card_type = !empty($card_type) ? $card_type : 'card';
+  $card->card_name = !empty($billing_address['name_line']) ? $billing_address['name_line'] : '';
+  $card->card_exp_month = $pane_values['credit_card']['exp_month'];
+  $card->card_exp_year = $pane_values['credit_card']['exp_year'];
+  $card->card_code = $pane_values['credit_card']['code'];
+  $card->status = 1;
+
+  # Prepare request data
+  $data = array(
+    'trnOrderNumber' => $order->order_number,
+    'trnCardOwner' => $card->card_name,
+    'trnCardNumber' => $pane_values['credit_card']['number'],
+    'trnExpMonth' => $card->card_exp_month,
+    'trnExpYear' => substr($card->card_exp_year, -2),
+    'trnCardCvd' => $card->card_code,
+  );
+
+  # Setup Billing details
+  $phone_field = $payment_method['settings']['phone_field_name'];
+  $phone_number = $billing->$phone_field->value();
+  $data += array(
+    'ordName' => $billing_address['name_line'],
+    'ordAddress1' => $billing_address['thoroughfare'],
+    'ordAddress2' => $billing_address['premise'],
+    'ordCity' => $billing_address['locality'],
+    'ordPostalCode' => $billing_address['postal_code'],
+    'ordProvince' => $billing_address['administrative_area'],
+    'ordCountry' => $billing_address['country'],
+    'ordPhoneNumber' => $phone_number,
+  );
+
+  # Fill in email
+  $u = user_load($order->uid);
+  if( isset($u->mail) ) { $data['ordEmailAddress'] = $u->mail; }
+
+  # Make the API request and check response
+  $result = _commerce_beanstream_payment_profile_request('N', $payment_method, $data);
+  if (empty($result) || $result['responseCode'] !== "1") {
+    $error = array(
+      '@code' => $result['responseCode'],
+      '%message' => $result['responseMessage'],
+    );
+    drupal_set_message(t('Payment Profile Creation failed: @code (%message)', $error), 'error');
+    watchdog('commerce_beanstream', 'Beanstream Secure Payment Profile creation failed: @code', $error);
+    return FALSE;
+  } else { # Success
+    // Save and log the creation of the new card on file.
+    $card->card_number = substr($result['trnCardNumber'], -4);
+    $card->remote_id = $result['customerCode'];
+    commerce_cardonfile_save($card);
+    watchdog('commerce_beanstream', 'Beanstream Secure Payment Profile @profile_id created and saved to user @uid.', array('@profile_id' => (string) $card->remote_id, '@uid' => $order->uid));
+    return $card;
+  }
+}
+
+/**
+ * Helper function to make a Payment Profile Beanstream API request.
+ *
+ * @param string $op One of: N, M, ADD_CARD, Q, BACKEND
+ * @param $payment_method
+ * @param $data
+ * @return bool|mixed
+ */
+function _commerce_beanstream_payment_profile_request($op, $payment_method, $data) {
+  $beanstream_url = $payment_method['settings']['payment_profile_url'];
+
+  $data += array(
+    'requestType' => $op,
+    'responseFormat' => 'QS', // QueryString format responses
+    'serviceVersion' => '1.0',
+    'merchant_id' => $payment_method['settings']['merchant_ID'],
+    'username' => $payment_method['settings']['username'],
+    'password' => $payment_method['settings']['password'],
+  );
+
+  return _commerce_beanstream_payment_curl($beanstream_url, $data);
+}
 
 /**
  * Creates an example payment transaction for the specified charge amount.

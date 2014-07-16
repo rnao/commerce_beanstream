@@ -112,19 +112,46 @@ function commerce_beanstream_payment_submit_form_validate($payment_method, $pane
  * Payment method callback: submit form submission.
  */
 function commerce_beanstream_payment_submit_form_submit($payment_method, $pane_form, $pane_values, $order, $charge) {
+  // Determine the credit card type if possible for use in later code.
+  if (!empty($pane_values['credit_card']['number'])) {
+    module_load_include('inc', 'commerce_payment', 'includes/commerce_payment.credit_card');
+    $card_type = commerce_payment_validate_credit_card_type($pane_values['credit_card']['number'], array_keys(commerce_payment_credit_card_types()));
+  }
+
+  // Get billing address
+  $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+  if( isset($order_wrapper->commerce_customer_billing) ) {
+    $billing = $order_wrapper->commerce_customer_billing;
+    $billing_address = $billing->commerce_customer_address->value();
+  } else {
+    drupal_set_message(t('A billing address must be available to perform a transaction'), 'error');
+    return FALSE;
+  }
+
   // If the customer specified payment using a card on file, attempt that now
   // and simply return the result.
   if (module_exists('commerce_cardonfile') && $payment_method['settings']['cardonfile'] &&
-    !empty($pane_values['cardonfile'])) {
+    !empty($pane_values['cardonfile']) && !empty($billing_address)) {
 
-   if ($pane_values['cardonfile'] === 'new') {
-     // Create a new profile, and then run the transaction
-     
-   } else {
-     // Use an existing profile
-     return commerce_beanstream_payment_cardonfile_submit($payment_method, $pane_form, $pane_values, $order, $charge);
-   }
+    if ($pane_values['cardonfile'] === 'new') {
+      // Create a new profile, and then run the transaction
 
+      # make the request here..
+      $card = _commerce_beanstream_payment_create_profile($payment_method, $order, $pane_form, $pane_values, $billing);
+
+      if (!empty($card)) {
+        # Run the transaction
+        # Call the standard "charge callback"
+      } else {
+        return FALSE;
+      }
+    } else {
+      // Use an existing profile
+      # This should use the "charge callback" too
+      return commerce_beanstream_payment_cardonfile_submit($payment_method, $pane_form, $pane_values, $order, $charge);
+    }
+
+  // No Card on File.
   } else {
 
     $order->data['commerce_beanstream_payment'] = $pane_values;
@@ -192,6 +219,13 @@ function commerce_beanstream_payment_settings_form($settings = NULL) {
     '#title' => t('Beanstream Payment URL'),
     '#description' => t('POST URI for Beanstream purchases'),
     '#default_value' => $settings['payment_url'],
+    '#required' => TRUE,
+  );
+  $form['payment_profile_url'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Beanstream Payment Profile URL'),
+    '#description' => t('POST URI for Beanstream payment profiles'),
+    '#default_value' => $settings['payment_profile_url'],
     '#required' => TRUE,
   );
   $form['merchant_ID'] = array(
