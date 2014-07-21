@@ -131,3 +131,39 @@ function commerce_beanstream_cardonfile_update($form, &$form_state, $payment_met
 *   The credit card data to be deleted
 */
 function commerce_beanstream_cardonfile_delete($form, &$form_state, $payment_method, $card_data){}
+
+/**
+ * Helper function to lookup a list of cards on file at Beanstream.
+ *
+ * @param $payment_method Array The payment method instance definition array
+ * @param $code String The customer code to lookup
+ * @param null $orderNum String The unique order number for this transaction
+ * @return array|bool List of cards, or FALSE on error/no cards on file.
+ */
+function _commerce_beanstream_cardonfile_getcards($payment_method, $code, $orderNum = NULL) {
+  $data = array(
+    'customerCode' => $code,
+  );
+
+  if (isset($orderNum)) {
+    $data['trnOrderNumber'] = $orderNum;
+  }
+
+  $result = _commerce_beanstream_payment_profile_request_xml('GET_CARDS', $payment_method, $data);
+
+  if (!empty($result) && $result->responseCode == "1") {
+    $cards = array();
+    foreach ($result->cardNode as $card) {
+      $cards[] = array(
+        'cardId' => $card->cardId->__toString(),
+        'owner' => $card->owner->__toString(),
+        'number' => substr($card->number->__toString(), -4),
+        'expiry' => $card->expiry->__toString(),
+      );
+    }
+    return $cards;
+  } else {
+    return FALSE;
+  }
+}
+
