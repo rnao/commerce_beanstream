@@ -225,41 +225,12 @@ function commerce_beanstream_payment_transaction($payment_method, $order, $charg
     'trnType' => 'P',
   );
 
-  //get billing address
-  $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
-  $phone_number_name = $payment_method['settings']['phone_field_name'];
-  if(isset($order_wrapper->commerce_customer_billing)){
-    $billing_address = $order_wrapper->commerce_customer_billing->commerce_customer_address->value();
-    $billing_request = array();
-    $billing_request['trnCardOwner'] = $billing_request['ordName'] = $billing_address['name_line'];
-    $billing_request['ordAddress1'] = $billing_address['thoroughfare'];
-    $billing_request['ordAddress2'] = $billing_address['premise'];
-    $billing_request['ordCity'] = $billing_address['locality'];
-    $billing_request['ordPostalCode'] = $billing_address['postal_code'];
-    $billing_request['ordProvince'] = $billing_address['administrative_area'];
-    $billing_request['ordCountry'] = $billing_address['country'];
-    $billing_request['ordPhoneNumber'] = $order_wrapper->commerce_customer_billing->$phone_number_name->value();
-    global $user;
-    if(isset($user->mail)){
-      $billing_request['ordEmailAddress'] = $user->mail;
-    }
-    $request = array_merge($request, $billing_request);
-  }else{
+  $bill_details = _commerce_beanstream_order_billing_details($payment_method, $order);
+  if (empty($bill_details['ordName'])) {
     drupal_set_message(t('A billing address must be available to perform a transaction'), 'error');
+    return FALSE;
   }
-  //get shipping details if they exist
-  if(isset($order_wrapper->commerce_customer_shipping)){
-    $shipping_address = $order_wrapper->commerce_customer_shipping->commerce_customer_address->value();
-    $shipping_request = array();
-    $shipping_request['shipName'] = $shipping_address['name_line'];
-    $shipping_request['shipAddress1'] = $shipping_address['thoroughfare'];
-    $shipping_request['shipAddress2'] = $shipping_address['premise'];
-    $shipping_request['shipCity'] = $shipping_address['locality'];
-    $shipping_request['shipProvince'] = $shipping_address['administrative_area'];
-    $shipping_request['shipCountry'] = $shipping_address['country'];
-    $shipping_request['shipPostalCode'] = $shipping_address['postal_code'];
-    $request = array_merge($request, $shipping_request);
-  }
+  array_merge($request, $bill_details);
 
   //send request
   $response = commerce_beanstream_request($payment_method, $request);
@@ -304,6 +275,59 @@ function commerce_beanstream_payment_transaction($payment_method, $order, $charg
   return $transaction;
 
 }
+
+/**
+ * Helper function to gather billing details from an order
+ *
+ * @param array $payment_method The Payment Method details
+ * @param $order Object The order object to get billing details for
+ * @return bool|array Array of billing details or FALSE if error.
+ */
+function _commerce_beanstream_order_billing_details($payment_method, $order) {
+  $return = array();
+
+  //get billing address
+  $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+  $phone_number_name = $payment_method['settings']['phone_field_name'];
+
+  if (isset($order_wrapper->commerce_customer_billing)) {
+    $billing_address = $order_wrapper->commerce_customer_billing->commerce_customer_address->value();
+    $billing_request = array();
+    $billing_request['trnCardOwner'] = $billing_request['ordName'] = $billing_address['name_line'];
+    $billing_request['ordAddress1'] = $billing_address['thoroughfare'];
+    $billing_request['ordAddress2'] = $billing_address['premise'];
+    $billing_request['ordCity'] = $billing_address['locality'];
+    $billing_request['ordPostalCode'] = $billing_address['postal_code'];
+    $billing_request['ordProvince'] = $billing_address['administrative_area'];
+    $billing_request['ordCountry'] = $billing_address['country'];
+    $billing_request['ordPhoneNumber'] = $order_wrapper->commerce_customer_billing->$phone_number_name->value();
+
+    $user = user_load($order->uid);
+    if (isset($user->mail)) {
+      $billing_request['ordEmailAddress'] = $user->mail;
+    }
+    $return = array_merge($return, $billing_request);
+  } else {
+    return FALSE;
+  }
+
+  //get shipping details if they exist
+  if (isset($order_wrapper->commerce_customer_shipping)) {
+    $shipping_address = $order_wrapper->commerce_customer_shipping->commerce_customer_address->value();
+    $shipping_request = array();
+    $shipping_request['shipName'] = $shipping_address['name_line'];
+    $shipping_request['shipAddress1'] = $shipping_address['thoroughfare'];
+    $shipping_request['shipAddress2'] = $shipping_address['premise'];
+    $shipping_request['shipCity'] = $shipping_address['locality'];
+    $shipping_request['shipProvince'] = $shipping_address['administrative_area'];
+    $shipping_request['shipCountry'] = $shipping_address['country'];
+    $shipping_request['shipPostalCode'] = $shipping_address['postal_code'];
+    $return = array_merge($return, $shipping_request);
+  }
+
+  return $return;
+}
+
 /** send transaction request to beanstream to process */
 
 function commerce_beanstream_request($payment_method, $request){
