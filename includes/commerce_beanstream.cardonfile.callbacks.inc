@@ -33,32 +33,75 @@ dd($card, "cardonfile_create card");
 * @return void TRUE if the transaction was successful
 */
 function commerce_beanstream_cardonfile_charge($payment_method, $card_data, $order, $charge = NULL) {
-// Format order total for transaction.
-if (!isset($charge)) {
-$wrapper = entity_metadata_wrapper('commerce_order', $order);
-$charge = commerce_line_items_total($wrapper->commerce_line_items);
-}
+  $url = $payment_method['settings']['payment_url'];
 
-//transaction info
-$transaction = commerce_payment_transaction_new('commerce_beanstream_payment', $order->order_id);
-$transaction->instance_id = $payment_method['instance_id'];
-$transaction->amount = $charge['amount'];
-$transaction->currency_code = $charge['currency_code'];
-$transaction->message = 'Name: @name';
+  // Format order total for transaction.
+  if (!isset($charge)) {
+    $wrapper = entity_metadata_wrapper('commerce_order', $order);
+    $charge = commerce_line_items_total($wrapper->commerce_line_items);
+  }
 
-//build the request
-$request = array(
-'merchant_id' => $payment_method['settings']['merchant_ID'],
-'requestType' => 'BACKEND',
-'trnOrderNumber' => $order->order_id,
-'trnAmount' => number_format(commerce_currency_amount_to_decimal($transaction->amount,$transaction->currency_code),2),
-'trnCardNumber' => $pane_values['credit_card']['number'],
-'trnExpMonth' => $pane_values['credit_card']['exp_month'],
-'trnCardCvd' => $pane_values['credit_card']['code'],
-'trnExpYear' => substr($pane_values['credit_card']['exp_year'], -2),
-'trnType' => 'P',
-);
+  //transaction info
+  $transaction = commerce_payment_transaction_new('commerce_beanstream_payment', $order->order_id);
+  $transaction->instance_id = $payment_method['instance_id'];
+  $transaction->amount = $charge['amount'];
+  $transaction->currency_code = $charge['currency_code'];
+  $transaction->message = 'Name: @name';
 
+  //build the request
+  $request = array(
+    'trnOrderNumber' => $order->order_id,
+    'trnAmount' => number_format(commerce_currency_amount_to_decimal($transaction->amount,$transaction->currency_code),2),
+    'customerCode' => $card_data->remote_id,
+  );
+
+  $bill_details = _commerce_beanstream_order_billing_details($payment_method, $order, $user, $request);
+  if (empty($bill_details['ordName'])) {
+    drupal_set_message(t('A billing address must be available to perform a transaction'), 'error');
+    return FALSE;
+  }
+  $request = array_merge($request, $bill_details);
+
+  $response = commerce_beanstream_request($payment_method, $request);
+
+  //if declined set the tranaction status to false
+  if($response['trnApproved'] != '1'  || empty($response['trnApproved'])){
+    $transaction->status = COMMERCE_PAYMENT_STATUS_FAILURE;
+  } else {
+    //otheriwse set transaction status appropriately
+    // Set the transaction status based on the type of transaction this was.
+    switch ($payment_method['settings']['txn_type']) {
+      case COMMERCE_CREDIT_AUTH_ONLY:
+        $transaction->status = COMMERCE_PAYMENT_STATUS_PENDING;
+        break;
+
+      case COMMERCE_CREDIT_AUTH_CAPTURE:
+        $transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
+        break;
+    }
+  }
+
+  //set tranaction variables to those returned from Beanstream
+  $transaction->remote_id = $response['trnId'];
+  $transaction->remote_status = $response['paymentMethod'];
+  $transaction->payload[REQUEST_TIME] = $response;
+
+  //set a msg to return to user
+  $message = 'Your transacton has been <b>' . $response['messageText'] . '</b>';
+
+  $transaction->message = $message;
+
+  // save the transaction
+  commerce_payment_transaction_save($transaction);
+
+  // if the transaction is declined return false send error to user
+  if($response['trnApproved'] != '1'){
+    drupal_set_message(t('We received the following error processing your card. Please enter your information again or try a different card.'), 'error');
+    drupal_set_message(check_plain($response['messageText']), 'error');
+    return FALSE;
+  }
+
+  return $transaction;
 }
 
 /**
