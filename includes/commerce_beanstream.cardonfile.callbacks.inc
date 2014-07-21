@@ -116,7 +116,28 @@ function commerce_beanstream_cardonfile_charge($payment_method, $card_data, $ord
 * @param object $card_data
 *   The new credit card data array to be processed
 */
-function commerce_beanstream_cardonfile_update($form, &$form_state, $payment_method, $card_data){}
+function commerce_beanstream_cardonfile_update($form, &$form_state, $payment_method, $card_data){
+  $cards = _commerce_beanstream_cardonfile_getcards($payment_method, $card_data->remote_id);
+
+  foreach ($cards as $card) {
+    if (($card['owner'] === $card_data->card_name) && ($card['number'] === $card_data->card_number)) {
+
+      $data = array(
+        'customerCode' => $card_data->remote_id,
+        'cardId' => $card['cardId'],
+        'trnExpYear' => substr($card_data->card_exp_year, -2),
+        'trnExpMonth' => $card_data->card_exp_month,
+      );
+
+      $result = _commerce_beanstream_payment_profile_request('MODIFY_CARD', $payment_method, $data);
+      if (!empty($result) && $result['responseCode'] === "1") {
+        return TRUE;
+      } else {
+        return FALSE;
+      }
+    }
+  }
+}
 
 /**
 * Card on file callback: delete card information
