@@ -84,15 +84,43 @@ function _commerce_beanstream_payment_profile_request($op, $payment_method, $dat
   $beanstream_url = $payment_method['settings']['payment_profile_url'];
 
   $data += array(
-    'requestType' => $op,
+    'operationType' => $op,
+    'serviceVersion' => '1.1',
+    'merchantId' => $payment_method['settings']['merchant_ID'],
+    'passCode' => $payment_method['settings']['passcode'],
     'responseFormat' => 'QS', // QueryString format responses
-    'serviceVersion' => '1.0',
-    'merchant_id' => $payment_method['settings']['merchant_ID'],
-    'username' => $payment_method['settings']['username'],
-    'password' => $payment_method['settings']['password'],
   );
 
-  return _commerce_beanstream_payment_curl($beanstream_url, $data);
+  $result = _commerce_beanstream_payment_curl($beanstream_url, $data);
+
+  //parse response string into variables
+  parse_str($result, $response);
+
+  return $response;
+}
+
+/**
+ * Helper function to make a Payment Profile Beanstream API request.
+ *
+ * @param string $op One of: N, M, ADD_CARD, Q, BACKEND
+ * @param $payment_method
+ * @param $data
+ * @return bool|mixed
+ */
+function _commerce_beanstream_payment_profile_request_xml($op, $payment_method, $data) {
+  $beanstream_url = $payment_method['settings']['payment_profile_url'];
+
+  $data += array(
+    'operationType' => $op,
+    'serviceVersion' => '1.1',
+    'merchantId' => $payment_method['settings']['merchant_ID'],
+    'passCode' => $payment_method['settings']['passcode'],
+    'responseFormat' => 'XML', // QueryString format responses
+  );
+
+  $result = _commerce_beanstream_payment_curl($beanstream_url, $data);
+
+  return simplexml_load_string($result);
 }
 
 /**
@@ -221,7 +249,12 @@ function commerce_beanstream_request($payment_method, $request){
      'responseFormat' => 'QS', // QueryString format responses
     );
 
-  return _commerce_beanstream_payment_curl($beanstream_url, $request);
+  $result = _commerce_beanstream_payment_curl($beanstream_url, $request);
+
+  //parse response string into variables
+  parse_str($result, $response);
+
+  return $response;
 }
 
 /**
@@ -256,10 +289,7 @@ function _commerce_beanstream_payment_curl($url, $data) {
   }
   curl_close( $ch );
 
-  //parse response string into variables
-  parse_str($txResult, $response);
-
-  return $response;
-  // TODO? Make the response an array and trim off the encapsulating characters.
+  // Return the result as-is, since the responseFormat may be different
+  return $txResult;
 }
 

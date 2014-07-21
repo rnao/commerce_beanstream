@@ -193,6 +193,7 @@ function commerce_beanstream_default_settings() {
     'merchant_ID' => '',
     'username' => '',
     'password' => '',
+    'passcode' => '',
     'phone_field_name' => '',
     'method' => 'card',
     'card_types' => array(),
@@ -249,6 +250,13 @@ function commerce_beanstream_payment_settings_form($settings = NULL) {
     '#title' => t('Password'),
     '#description' => t('Your password, created in the Beanstream customer interface.'),
     '#default_value' => $settings['password'],
+    '#required' => TRUE,
+  );
+  $form['passcode'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Pass Code'),
+    '#description' => t('API access passcode that has been generated on the payment profile configuration page.'),
+    '#default_value' => $settings['passcode'],
     '#required' => TRUE,
   );
   $form['phone_field_name'] = array(
