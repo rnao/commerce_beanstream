@@ -22,6 +22,7 @@ function commerce_beanstream_payment_commerce_payment_method_info() {
       'charge callback' => 'commerce_beanstream_cardonfile_charge',
       'update callback' => 'commerce_beanstream_cardonfile_update',
       'delete callback' => 'commerce_beanstream_cardonfile_delete',
+      #'create callback' => 'commerce_beanstream_cardonfile_create',
     ),
   );
 

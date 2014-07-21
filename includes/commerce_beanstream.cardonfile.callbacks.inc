@@ -11,10 +11,14 @@
 * @return array Profile info, with at least a 'remote_id' key
 */
 function commerce_beanstream_cardonfile_create($form, $form_state, $payment_method, $card) {
-dd($form, "cardonfile_create form");
-dd($form_state, "cardonfile_create form_state");
-dd($payment_method, "cardonfile_create payment_method");
-dd($card, "cardonfile_create card");
+  drupal_set_message("cardonfile_create callback");
+  dd($form, "cardonfile_create form");
+  dd($form_state, "cardonfile_create form_state");
+  dd($payment_method, "cardonfile_create payment_method");
+  dd($card, "cardonfile_create card");
+  $u = user_load($card->uid);
+  $p = commerce_customer_profile_load_multiple(array(), array('uid' => $card->uid));
+  return array('remote_id' => 1);
 }
 
 /**
