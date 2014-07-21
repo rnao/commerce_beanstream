@@ -133,8 +133,9 @@ function commerce_beanstream_payment_submit_form_submit($payment_method, $pane_f
   if (module_exists('commerce_cardonfile') && $payment_method['settings']['cardonfile'] &&
     !empty($pane_values['cardonfile']) && !empty($billing_address)) {
 
+
+    // Create a new profile, and then run the transaction
     if ($pane_values['cardonfile'] === 'new') {
-      // Create a new profile, and then run the transaction
 
       # make the request here..
       $card = _commerce_beanstream_payment_create_profile($payment_method, $order, $pane_form, $pane_values, $billing);
@@ -145,8 +146,9 @@ function commerce_beanstream_payment_submit_form_submit($payment_method, $pane_f
       } else {
         return FALSE;
       }
+
+    // Use an existing profile
     } else {
-      // Use an existing profile
       # This should use the "charge callback" too
       return commerce_beanstream_payment_cardonfile_submit($payment_method, $pane_form, $pane_values, $order, $charge);
     }

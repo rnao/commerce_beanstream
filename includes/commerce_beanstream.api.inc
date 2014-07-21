@@ -98,14 +98,14 @@ function _commerce_beanstream_payment_profile_request($op, $payment_method, $dat
 /**
  * Creates an example payment transaction for the specified charge amount.
  *
- * @param Object $payment_method
- *   The payment method instance object used to charge this payment.
- * @param Object $order
- *   The order object the payment applies to.
- * @param Array $charge
- *   An array indicating the amount and currency code to charge.
- * @param Array $pane_values
- *   The array of pane values entered on the submission form.
+ * @param $payment_method
+ *   Object The payment method instance object used to charge this payment.
+ * @param $order
+ *   Object The order object the payment applies to.
+ * @param $charge
+ *   Array indicating the amount and currency code to charge.
+ * @param $pane_values
+ *   Array of pane values entered on the submission form.
  * @return bool $transaction Object
  */
 function commerce_beanstream_payment_transaction($payment_method, $order, $charge, $pane_values){
