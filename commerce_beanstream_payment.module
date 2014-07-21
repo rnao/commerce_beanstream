@@ -142,7 +142,7 @@ function commerce_beanstream_payment_submit_form_submit($payment_method, $pane_f
 
       if (!empty($card)) {
         # Run the transaction
-        # Call the standard "charge callback"
+        return commerce_beanstream_cardonfile_charge($payment_method, $card, $order, $charge);
       } else {
         return FALSE;
       }
@@ -150,7 +150,14 @@ function commerce_beanstream_payment_submit_form_submit($payment_method, $pane_f
     // Use an existing profile
     } else {
       # This should use the "charge callback" too
-      return commerce_beanstream_payment_cardonfile_submit($payment_method, $pane_form, $pane_values, $order, $charge);
+      $card = commerce_cardonfile_load($pane_values['cardonfile']);
+      // Fail now if it is no longer available or the card is inactive.
+      if (empty($card) || $card->status == 0) {
+        drupal_set_message(t('The requested card on file is no longer valid.'), 'error');
+        return FALSE;
+      }
+
+      return commerce_beanstream_cardonfile_charge($payment_method, $card, $order, $charge);
     }
 
   // No Card on File.
