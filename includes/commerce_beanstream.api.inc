@@ -59,9 +59,34 @@ function _commerce_beanstream_payment_create_profile($payment_method, $order, $p
       '@code' => $result['responseCode'],
       '%message' => $result['responseMessage'],
     );
-    drupal_set_message(t('Payment Profile Creation failed: @code (%message)', $error), 'error');
-    watchdog('commerce_beanstream', 'Beanstream Secure Payment Profile creation failed: @code', $error);
-    return FALSE;
+
+    if ($result['responseCode'] === "24") {
+      // Try to ADD_CARD to existing profile
+      if (isset($result['matchedCustomerCode'])) {
+
+        $data['customerCode'] = $result['matchedCustomerCode'];
+        $card_result = _commerce_beanstream_payment_profile_request('ADD_CARD', $payment_method, $data);
+
+        if (!empty($card_result) && $card_result['responseCode'] === "1") {
+          $card->card_number = substr($pane_values['credit_card']['number'], -4);
+          $card->remote_id = $result['matchedCustomerCode'];
+          #$card->card_exp_year = date("Y", strtotime(sprintf("%s-01-01", $orig_data['trnExpYear'])));
+          commerce_cardonfile_save($card);
+          return $card;
+        } else {
+          watchdog('commerce_beanstream', 'Beanstream Payment Profile error: '.$card_result['responseMessage']);
+          return FALSE;
+        }
+      } else {
+        watchdog('commerce_beanstream', 'Beanstream Payment Profile error: '.$result['responseMessage']);
+        return FALSE;
+      }
+
+    } else {
+      drupal_set_message(t('Payment Profile Creation failed: @code (%message)', $error), 'error');
+      watchdog('commerce_beanstream', 'Beanstream Secure Payment Profile creation failed: @code', $error);
+      return _commerce_beanstream_handle_errors($payment_method, $pane_form, $result, $phone_field);
+    }
   } else { # Success
     // Save and log the creation of the new card on file.
     $card->card_number = substr($result['trnCardNumber'], -4);
@@ -69,6 +94,49 @@ function _commerce_beanstream_payment_create_profile($payment_method, $order, $p
     commerce_cardonfile_save($card);
     watchdog('commerce_beanstream', 'Beanstream Secure Payment Profile @profile_id created and saved to user @uid.', array('@profile_id' => (string) $card->remote_id, '@uid' => $order->uid));
     return $card;
+  }
+}
+
+function _commerce_beanstream_handle_errors($payment_method, $pane_form, $result, $phone_field) {
+  $bill_prefix = 'customer_profile_billing[commerce_customer_address][und][0][';
+  $prefix = implode('][', array_merge($pane_form['#array_parents'], array('credit_card'))) . '][';
+
+  $fields_map = array(
+    'trnCardOwner' => $bill_prefix . 'name_line',
+    'ordName' => $bill_prefix . 'name_line',
+    'trnCardNumber' => $prefix . 'number',
+    'trnExpMonth' => $prefix . 'exp_month',
+    'trnExpYear' => $prefix . 'exp_year',
+    'trnCardCvd' => $prefix . 'code',
+    'ordAddress1' => $bill_prefix . 'thoroughfare',
+    'ordAddress2' => $bill_prefix . 'premise',
+    'ordProvince' => $bill_prefix . 'administrative_area',
+    'ordCountry' => $bill_prefix . 'country',
+    'ordPostalCode' => $bill_prefix . 'postal_code',
+    'ordPhoneNumber' => $bill_prefix . $phone_field,
+    'ordEmailAddress' => '',
+  );
+
+  switch ($result['responseCode']) {
+    case '2': # Failed card verification
+      break;
+    case '15': # Customer code does not exist
+      break;
+    case '16': # Customer code already exists
+      break;
+    case '17': # Duplicate match on payment info
+      break;
+    case '19': # Custom address/payment info failed validation
+      watchdog('commerce_beanstream', 'Beanstream Payment Profile error: '.$result['errorMessage']);
+      $error_fields = preg_split('/,/', $result['errorFields']);
+      $error_msgs = preg_split('/<br>/', $result['errorMessage']);
+      foreach ($error_fields as $i => $e) {
+        form_set_error($fields_map[$e], $error_msgs[$i]);
+      }
+      return FALSE;
+      break;
+    case '24': # Duplicate match on billing information
+      # Instead add a card to the existing profile, and then return it.
   }
 }
 
