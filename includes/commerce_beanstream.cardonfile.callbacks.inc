@@ -151,7 +151,29 @@ function commerce_beanstream_cardonfile_update($form, &$form_state, $payment_met
 * @param object $card_data
 *   The credit card data to be deleted
 */
-function commerce_beanstream_cardonfile_delete($form, &$form_state, $payment_method, $card_data){}
+function commerce_beanstream_cardonfile_delete($form, &$form_state, $payment_method, $card_data){
+  $cards = _commerce_beanstream_cardonfile_getcards($payment_method, $card_data->remote_id);
+
+  foreach ($cards as $card) {
+    // TODO: Should check expiry and cardType as well here..
+    if (($card['owner'] === $card_data->card_name) && ($card['number'] === $card_data->card_number)) {
+      $data = array(
+        'customerCode' => $card_data->remote_id,
+        'cardId' => $card['cardId'],
+      );
+
+      $result = _commerce_beanstream_payment_profile_request_xml('DELETE_CARD', $payment_method, $data);
+
+      if (!empty($result) && $result->responseCode == "1") {
+        return TRUE;
+      } else {
+        return FALSE;
+      }
+    }
+  }
+
+  return FALSE;
+}
 
 /**
  * Helper function to lookup a list of cards on file at Beanstream.
