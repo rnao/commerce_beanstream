@@ -93,7 +93,7 @@ function commerce_beanstream_payment_submit_form_validate($payment_method, $pane
   // If the customer specified a card on file, skip the normal validation.
   if (module_exists('commerce_cardonfile') && !empty($payment_method['settings']['cardonfile']) &&
     !empty($pane_values['cardonfile']) && $pane_values['cardonfile'] !== 'new') {
-    return;
+    return TRUE;
   }
 
   // Validate the credit card fields.
@@ -113,12 +113,6 @@ function commerce_beanstream_payment_submit_form_validate($payment_method, $pane
  * Payment method callback: submit form submission.
  */
 function commerce_beanstream_payment_submit_form_submit($payment_method, $pane_form, $pane_values, $order, $charge) {
-  // Determine the credit card type if possible for use in later code.
-  if (!empty($pane_values['credit_card']['number'])) {
-    module_load_include('inc', 'commerce_payment', 'includes/commerce_payment.credit_card');
-    $card_type = commerce_payment_validate_credit_card_type($pane_values['credit_card']['number'], array_keys(commerce_payment_credit_card_types()));
-  }
-
   // Get billing address
   $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
   if( isset($order_wrapper->commerce_customer_billing) ) {
@@ -175,21 +169,6 @@ function commerce_beanstream_payment_submit_form_submit($payment_method, $pane_f
     return TRUE;
   }
 }
-
-function commerce_beanstream_payment_cardonfile_submit($payment_method, $pane_form, $pane_values, $order, $charge) {
-  // First attempt to load the card on file.
-  $card_data = commerce_cardonfile_load($pane_values['cardonfile']);
-
-  // Fail now if it is no longer available or the card is inactive.
-  if (empty($card_data) || $card_data->status == 0) {
-    drupal_set_message(t('The requested card on file is no longer valid.'), 'error');
-    return FALSE;
-  }
-
-  return commerce_beanstream_cardonfile_charge($payment_method, $card_data, $order, $charge);
-}
-
-
 
 /**
  * Returns the default settings for the beanstream payment method.

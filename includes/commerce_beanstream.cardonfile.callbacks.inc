@@ -34,7 +34,7 @@ function commerce_beanstream_cardonfile_create($form, $form_state, $payment_meth
 *   The price array for the charge amount with keys of 'amount' and 'currency'
 *   If null the total value of the order is used.
 *
-* @return void TRUE if the transaction was successful
+* @return bool TRUE if the transaction was successful, otherwise FALSE
 */
 function commerce_beanstream_cardonfile_charge($payment_method, $card_data, $order, $charge = NULL) {
   $url = $payment_method['settings']['payment_url'];
@@ -105,7 +105,7 @@ function commerce_beanstream_cardonfile_charge($payment_method, $card_data, $ord
     return FALSE;
   }
 
-  return $transaction;
+  return TRUE;
 }
 
 /**
