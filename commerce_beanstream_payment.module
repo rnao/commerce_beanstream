@@ -29,6 +29,11 @@ function commerce_beanstream_payment_commerce_payment_method_info() {
   return $payment_methods;
 }
 
+/**
+ * Implements hook_menu().
+ *
+ * @return array Menu item for voiding payments (not fully implemented)
+ */
 function commerce_beanstream_payment_menu() {
   $items = array();
   /** Creates a menu for voiding transactions. */
@@ -47,6 +52,13 @@ function commerce_beanstream_payment_menu() {
 }
 
 
+/**
+ * Access callback for voiding transactions.
+ *
+ * @param $order Object the order to void
+ * @param $transaction Object the transaction
+ * @return bool TRUE if access is granted.
+ */
 function commerce_beanstream_void_access($order, $transaction) {
   if ($transaction->payment_method != 'commerce_beanstream_payment' || empty($transaction->remote_id)){
     //||!in_array(strtoupper($transaction->remote_status), array('AUTH_ONLY', 'PRIOR_AUTH_CAPTURE', 'AUTH_CAPTURE'))) {
@@ -67,6 +79,12 @@ function commerce_beanstream_void_access($order, $transaction) {
 
 /**
  * Payment method callback: submit form.
+ *
+ * @param $payment_method Array of payment method info
+ * @param $pane_values Array of submitted values
+ * @param $checkout_pane Array checkout pane form
+ * @param $order Object order object
+ * @return Array of form fields
  */
 function commerce_beanstream_payment_submit_form($payment_method, $pane_values, $checkout_pane, $order) {
   module_load_include('inc', 'commerce_payment', 'includes/commerce_payment.credit_card');
@@ -88,6 +106,13 @@ function commerce_beanstream_payment_submit_form($payment_method, $pane_values, 
 
 /**
  * Payment method callback: submit form validation.
+ *
+ * @param $payment_method Array of payment method info
+ * @param $pane_form Array form fields
+ * @param $pane_values Array of submitted values
+ * @param $order Object order object
+ * @param array $form_parents
+ * @return bool TRUE if the payment validates
  */
 function commerce_beanstream_payment_submit_form_validate($payment_method, $pane_form, $pane_values, $order, $form_parents = array()) {
   // If the customer specified a card on file, skip the normal validation.
@@ -111,6 +136,13 @@ function commerce_beanstream_payment_submit_form_validate($payment_method, $pane
 
 /**
  * Payment method callback: submit form submission.
+ *
+ * @param $payment_method Array of payment method info
+ * @param $pane_form Array form fields
+ * @param $pane_values Array of submitted values
+ * @param $order Object order object
+ * @param $charge Array detailing amount and currency of transaction
+ * @return bool TRUE if transaction was successful, FALSE otherwise
  */
 function commerce_beanstream_payment_submit_form_submit($payment_method, $pane_form, $pane_values, $order, $charge) {
   // Get billing address
@@ -172,6 +204,8 @@ function commerce_beanstream_payment_submit_form_submit($payment_method, $pane_f
 
 /**
  * Returns the default settings for the beanstream payment method.
+ *
+ * @return array default settings for hook_payment_settings_form().
  */
 function commerce_beanstream_default_settings() {
   return array(
@@ -187,8 +221,13 @@ function commerce_beanstream_default_settings() {
     'txn_type' => COMMERCE_CREDIT_AUTH_CAPTURE,
   );
 }
-/** Create a settings form for the required Beanstream settings */
 
+/**
+ * Create a settings form for the required Beanstream settings
+ *
+ * @param null $settings Array of settings to configure
+ * @return array Form fields to configure payment method instance.
+ */
 function commerce_beanstream_payment_settings_form($settings = NULL) {
   module_load_include('inc', 'commerce_payment', 'includes/commerce_payment.credit_card');
 

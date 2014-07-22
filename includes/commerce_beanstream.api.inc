@@ -3,6 +3,16 @@
 define('COMMERCE_BEANSTREAM_PAYMENT_URL', 'https://www.beanstream.com/scripts/process_transaction.asp');//SOAP URL https://www.beanstream.com/api/v1/payments
 define('COMMERCE_BEANSTREAM_PAYMENT_PROFILE_URL', 'https://www.beanstream.com/scripts/payment_profile.asp');
 
+/**
+ * Helper function to create a Secure Payment Profile and add a card to it.
+ *
+ * @param $payment_method Array payment method instance info
+ * @param $order Object the order object
+ * @param $pane_form Array form array
+ * @param $pane_values Array form values
+ * @param $billing Object billing profile entity wrapper
+ * @return Object|bool The card object if created successfully, FALSE otherwise.
+ */
 function _commerce_beanstream_payment_create_profile($payment_method, $order, $pane_form, $pane_values, $billing) {
   // Determine the credit card type if possible for use in later code.
   if (!empty($pane_values['credit_card']['number'])) {
@@ -149,9 +159,9 @@ function _commerce_beanstream_handle_errors($payment_method, $pane_form, $result
  * Helper function to make a Payment Profile Beanstream API request.
  *
  * @param string $op One of: N, M, ADD_CARD, Q, BACKEND
- * @param $payment_method
- * @param $data
- * @return bool|mixed
+ * @param $payment_method Array payment method instance info
+ * @param $data Array data elements to pass to Beanstream Payment Profile API
+ * @return Array parsed payment profile response
  */
 function _commerce_beanstream_payment_profile_request($op, $payment_method, $data) {
   $beanstream_url = $payment_method['settings']['payment_profile_url'];
@@ -176,9 +186,9 @@ function _commerce_beanstream_payment_profile_request($op, $payment_method, $dat
  * Helper function to make a Payment Profile Beanstream API request.
  *
  * @param string $op One of: N, M, ADD_CARD, Q, BACKEND
- * @param $payment_method
- * @param $data
- * @return bool|mixed
+ * @param $payment_method Array payment method instance info
+ * @param $data Array data elements to pass to Beanstream Payment Profile API
+ * @return Object SimpleXML object result of Payment Profile request
  */
 function _commerce_beanstream_payment_profile_request_xml($op, $payment_method, $data) {
   $beanstream_url = $payment_method['settings']['payment_profile_url'];
@@ -333,8 +343,13 @@ function _commerce_beanstream_order_billing_details($payment_method, $order) {
   return $return;
 }
 
-/** send transaction request to beanstream to process */
-
+/**
+ * Send transaction request to Beanstream Process Transaction API
+ *
+ * @param $payment_method Array payment method instance info
+ * @param $request Array data elements to pass to Beanstream Process Transaction API
+ * @return Array parsed response to Beanstream API request.
+ */
 function commerce_beanstream_request($payment_method, $request){
    $beanstream_url = $payment_method['settings']['payment_url'];
 

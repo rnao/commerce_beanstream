@@ -109,17 +109,18 @@ function commerce_beanstream_cardonfile_charge($payment_method, $card_data, $ord
 }
 
 /**
-* Card on file callback: update card information
-*
-* @param array $form
-*   The payment form
-* @param array $form_state
-*   The payment form state
-* @param object $payment_method
-*   The payment method instance definition array
-* @param object $card_data
-*   The new credit card data array to be processed
-*/
+ * Card on file callback: update card information
+ *
+ * @param array $form
+ *   The payment form
+ * @param array $form_state
+ *   The payment form state
+ * @param object $payment_method
+ *   The payment method instance definition array
+ * @param object $card_data
+ *   The new credit card data array to be processed
+ * @return bool TRUE if update was successful, or FALSE otherwise.
+ */
 function commerce_beanstream_cardonfile_update($form, &$form_state, $payment_method, $card_data){
   $cards = _commerce_beanstream_cardonfile_getcards($payment_method, $card_data->remote_id);
 
@@ -144,17 +145,18 @@ function commerce_beanstream_cardonfile_update($form, &$form_state, $payment_met
 }
 
 /**
-* Card on file callback: delete card information
-*
-* @param array $form
-*   The payment form
-* @param array $form_state
-*   The payment form state
-* @param object $payment_method
-*   The payment method instance definition array
-* @param object $card_data
-*   The credit card data to be deleted
-*/
+ * Card on file callback: delete card information
+ *
+ * @param array $form
+ *   The payment form
+ * @param array $form_state
+ *   The payment form state
+ * @param object $payment_method
+ *   The payment method instance definition array
+ * @param object $card_data
+ *   The credit card data to be deleted
+ * @return bool TRUE if card deleted successfully, or FALSE otherwise.
+ */
 function commerce_beanstream_cardonfile_delete($form, &$form_state, $payment_method, $card_data){
   $cards = _commerce_beanstream_cardonfile_getcards($payment_method, $card_data->remote_id);
 
