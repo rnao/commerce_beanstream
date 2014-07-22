@@ -13,7 +13,7 @@ define('COMMERCE_BEANSTREAM_PAYMENT_PROFILE_URL', 'https://www.beanstream.com/sc
  * @param $billing Object billing profile entity wrapper
  * @return Object|bool The card object if created successfully, FALSE otherwise.
  */
-function _commerce_beanstream_payment_create_profile($payment_method, $order, $pane_form, $pane_values, $billing) {
+function commerce_beanstream_payment_create_profile($payment_method, $order, $pane_form, $pane_values, $billing) {
   // Determine the credit card type if possible for use in later code.
   if (!empty($pane_values['credit_card']['number'])) {
     module_load_include('inc', 'commerce_payment', 'includes/commerce_payment.credit_card');
@@ -107,104 +107,6 @@ function _commerce_beanstream_payment_create_profile($payment_method, $order, $p
   }
 }
 
-function _commerce_beanstream_handle_errors($payment_method, $pane_form, $result, $phone_field) {
-  $bill_prefix = 'customer_profile_billing[commerce_customer_address][und][0][';
-  $prefix = implode('][', array_merge($pane_form['#array_parents'], array('credit_card'))) . '][';
-
-  $fields_map = array(
-    'trnCardOwner' => $bill_prefix . 'name_line',
-    'ordName' => $bill_prefix . 'name_line',
-    'trnCardNumber' => $prefix . 'number',
-    'trnExpMonth' => $prefix . 'exp_month',
-    'trnExpYear' => $prefix . 'exp_year',
-    'trnCardCvd' => $prefix . 'code',
-    'ordAddress1' => $bill_prefix . 'thoroughfare',
-    'ordAddress2' => $bill_prefix . 'premise',
-    'ordProvince' => $bill_prefix . 'administrative_area',
-    'ordCountry' => $bill_prefix . 'country',
-    'ordPostalCode' => $bill_prefix . 'postal_code',
-    'ordPhoneNumber' => $bill_prefix . $phone_field,
-    'ordEmailAddress' => '',
-  );
-
-  switch ($result['responseCode']) {
-    case '2': # Failed card verification
-      return FALSE;
-      break;
-    case '15': # Customer code does not exist
-      return FALSE;
-      break;
-    case '16': # Customer code already exists
-      return FALSE;
-      break;
-    case '17': # Duplicate match on payment info
-      return FALSE;
-      break;
-    case '19': # Custom address/payment info failed validation
-      watchdog('commerce_beanstream', 'Beanstream Payment Profile error: '.$result['errorMessage']);
-      $error_fields = preg_split('/,/', $result['errorFields']);
-      $error_msgs = preg_split('/<br>/', $result['errorMessage']);
-      foreach ($error_fields as $i => $e) {
-        form_set_error($fields_map[$e], $error_msgs[$i]);
-      }
-      return FALSE;
-      break;
-  }
-
-  // If nothing else went wrong, return TRUE
-  return TRUE;
-}
-
-/**
- * Helper function to make a Payment Profile Beanstream API request.
- *
- * @param string $op One of: N, M, ADD_CARD, Q, BACKEND
- * @param $payment_method Array payment method instance info
- * @param $data Array data elements to pass to Beanstream Payment Profile API
- * @return Array parsed payment profile response
- */
-function _commerce_beanstream_payment_profile_request($op, $payment_method, $data) {
-  $beanstream_url = $payment_method['settings']['payment_profile_url'];
-
-  $data += array(
-    'operationType' => $op,
-    'serviceVersion' => '1.1',
-    'merchantId' => $payment_method['settings']['merchant_ID'],
-    'passCode' => $payment_method['settings']['passcode'],
-    'responseFormat' => 'QS', // QueryString format responses
-  );
-
-  $result = _commerce_beanstream_payment_curl($beanstream_url, $data);
-
-  //parse response string into variables
-  parse_str($result, $response);
-
-  return $response;
-}
-
-/**
- * Helper function to make a Payment Profile Beanstream API request.
- *
- * @param string $op One of: N, M, ADD_CARD, Q, BACKEND
- * @param $payment_method Array payment method instance info
- * @param $data Array data elements to pass to Beanstream Payment Profile API
- * @return Object SimpleXML object result of Payment Profile request
- */
-function _commerce_beanstream_payment_profile_request_xml($op, $payment_method, $data) {
-  $beanstream_url = $payment_method['settings']['payment_profile_url'];
-
-  $data += array(
-    'operationType' => $op,
-    'serviceVersion' => '1.1',
-    'merchantId' => $payment_method['settings']['merchant_ID'],
-    'passCode' => $payment_method['settings']['passcode'],
-    'responseFormat' => 'XML', // QueryString format responses
-  );
-
-  $result = _commerce_beanstream_payment_curl($beanstream_url, $data);
-
-  return simplexml_load_string($result);
-}
 
 /**
  * Creates an example payment transaction for the specified charge amount.
@@ -248,7 +150,7 @@ function commerce_beanstream_payment_transaction($payment_method, $order, $charg
   array_merge($request, $bill_details);
 
   //send request
-  $response = commerce_beanstream_request($payment_method, $request);
+  $response = _commerce_beanstream_transaction_request($payment_method, $request);
 
   //if declined set the tranaction status to false
   if($response['trnApproved'] != '1'  || empty($response['trnApproved'])){
@@ -290,6 +192,8 @@ function commerce_beanstream_payment_transaction($payment_method, $order, $charg
   return $transaction;
 
 }
+
+// Helpers
 
 /**
  * Helper function to gather billing details from an order
@@ -344,13 +248,72 @@ function _commerce_beanstream_order_billing_details($payment_method, $order) {
 }
 
 /**
+ * Helper function to handle errors from a Payment Profile API transaction.
+ *
+ * @param $payment_method Array payment method instance info
+ * @param $pane_form Array form fields from the pane
+ * @param $result Array result of initial API transaction
+ * @param $phone_field String name of the field containing phone number
+ * @return bool FALSE to indicate errors were handled, TRUE if none found.
+ */
+function _commerce_beanstream_handle_errors($payment_method, $pane_form, $result, $phone_field) {
+  $bill_prefix = 'customer_profile_billing[commerce_customer_address][und][0][';
+  $prefix = implode('][', array_merge($pane_form['#array_parents'], array('credit_card'))) . '][';
+
+  $fields_map = array(
+    'trnCardOwner' => $bill_prefix . 'name_line',
+    'ordName' => $bill_prefix . 'name_line',
+    'trnCardNumber' => $prefix . 'number',
+    'trnExpMonth' => $prefix . 'exp_month',
+    'trnExpYear' => $prefix . 'exp_year',
+    'trnCardCvd' => $prefix . 'code',
+    'ordAddress1' => $bill_prefix . 'thoroughfare',
+    'ordAddress2' => $bill_prefix . 'premise',
+    'ordProvince' => $bill_prefix . 'administrative_area',
+    'ordCountry' => $bill_prefix . 'country',
+    'ordPostalCode' => $bill_prefix . 'postal_code',
+    'ordPhoneNumber' => $bill_prefix . $phone_field,
+    'ordEmailAddress' => '',
+  );
+
+  switch ($result['responseCode']) {
+    case '2': # Failed card verification
+      return FALSE;
+      break;
+    case '15': # Customer code does not exist
+      return FALSE;
+      break;
+    case '16': # Customer code already exists
+      return FALSE;
+      break;
+    case '17': # Duplicate match on payment info
+      return FALSE;
+      break;
+    case '19': # Custom address/payment info failed validation
+      watchdog('commerce_beanstream', 'Beanstream Payment Profile error: '.$result['errorMessage']);
+      $error_fields = preg_split('/,/', $result['errorFields']);
+      $error_msgs = preg_split('/<br>/', $result['errorMessage']);
+      foreach ($error_fields as $i => $e) {
+        form_set_error($fields_map[$e], $error_msgs[$i]);
+      }
+      return FALSE;
+      break;
+  }
+
+  // If nothing else went wrong, return TRUE
+  return TRUE;
+}
+
+// Helper functions to handle Beanstream API transactions
+
+/**
  * Send transaction request to Beanstream Process Transaction API
  *
  * @param $payment_method Array payment method instance info
  * @param $request Array data elements to pass to Beanstream Process Transaction API
  * @return Array parsed response to Beanstream API request.
  */
-function commerce_beanstream_request($payment_method, $request){
+function _commerce_beanstream_transaction_request($payment_method, $request){
    $beanstream_url = $payment_method['settings']['payment_url'];
 
    $request += array(
@@ -367,6 +330,57 @@ function commerce_beanstream_request($payment_method, $request){
   parse_str($result, $response);
 
   return $response;
+}
+
+/**
+ * Helper function to make a Payment Profile Beanstream API request.
+ *
+ * @param string $op One of: N, M, ADD_CARD, Q, BACKEND
+ * @param $payment_method Array payment method instance info
+ * @param $data Array data elements to pass to Beanstream Payment Profile API
+ * @return Array parsed payment profile response
+ */
+function _commerce_beanstream_payment_profile_request($op, $payment_method, $data) {
+  $beanstream_url = $payment_method['settings']['payment_profile_url'];
+
+  $data += array(
+    'operationType' => $op,
+    'serviceVersion' => '1.1',
+    'merchantId' => $payment_method['settings']['merchant_ID'],
+    'passCode' => $payment_method['settings']['passcode'],
+    'responseFormat' => 'QS', // QueryString format responses
+  );
+
+  $result = _commerce_beanstream_payment_curl($beanstream_url, $data);
+
+  //parse response string into variables
+  parse_str($result, $response);
+
+  return $response;
+}
+
+/**
+ * Helper function to make a Payment Profile Beanstream API request.
+ *
+ * @param string $op One of: N, M, ADD_CARD, Q, BACKEND
+ * @param $payment_method Array payment method instance info
+ * @param $data Array data elements to pass to Beanstream Payment Profile API
+ * @return Object SimpleXML object result of Payment Profile request
+ */
+function _commerce_beanstream_payment_profile_request_xml($op, $payment_method, $data) {
+  $beanstream_url = $payment_method['settings']['payment_profile_url'];
+
+  $data += array(
+    'operationType' => $op,
+    'serviceVersion' => '1.1',
+    'merchantId' => $payment_method['settings']['merchant_ID'],
+    'passCode' => $payment_method['settings']['passcode'],
+    'responseFormat' => 'XML', // QueryString format responses
+  );
+
+  $result = _commerce_beanstream_payment_curl($beanstream_url, $data);
+
+  return simplexml_load_string($result);
 }
 
 /**

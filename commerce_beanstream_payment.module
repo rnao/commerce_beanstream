@@ -165,7 +165,7 @@ function commerce_beanstream_payment_submit_form_submit($payment_method, $pane_f
     if ($pane_values['cardonfile'] === 'new') {
 
       # make the request here..
-      $card = _commerce_beanstream_payment_create_profile($payment_method, $order, $pane_form, $pane_values, $billing);
+      $card = commerce_beanstream_payment_create_profile($payment_method, $order, $pane_form, $pane_values, $billing);
 
       if (!empty($card)) {
         # Run the transaction

@@ -42,7 +42,7 @@ function commerce_beanstream_void_form_submit($form, &$form_state) {
   ); 
 //dd($request, 'VOID REQUEST');
 //dd($payment_method, 'FORM STATE PYMT METHOD');
-  $response = commerce_beanstream_request($form_state['payment_method'], $request);
+  $response = _commerce_beanstream_transaction_request($form_state['payment_method'], $request);
 
   dd($response, 'VOID RESPONSE');
 

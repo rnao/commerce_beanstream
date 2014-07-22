@@ -66,7 +66,7 @@ function commerce_beanstream_cardonfile_charge($payment_method, $card_data, $ord
   }
   $request = array_merge($request, $bill_details);
 
-  $response = commerce_beanstream_request($payment_method, $request);
+  $response = _commerce_beanstream_transaction_request($payment_method, $request);
 
   //if declined set the tranaction status to false
   if($response['trnApproved'] != '1'  || empty($response['trnApproved'])){
