@@ -278,17 +278,9 @@ function _commerce_beanstream_handle_errors($payment_method, $pane_form, $result
 
   switch ($result['responseCode']) {
     case '2': # Failed card verification
-      return FALSE;
-      break;
     case '15': # Customer code does not exist
-      return FALSE;
-      break;
     case '16': # Customer code already exists
-      return FALSE;
-      break;
     case '17': # Duplicate match on payment info
-      return FALSE;
-      break;
     case '19': # Custom address/payment info failed validation
       watchdog('commerce_beanstream', 'Beanstream Payment Profile error: '.$result['errorMessage']);
       $error_fields = preg_split('/,/', $result['errorFields']);
