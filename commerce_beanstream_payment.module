@@ -3,16 +3,16 @@
 /** this module was adapted from the authorize.net payment method module and the commerce payment method example */
 
 
-require_once(drupal_get_path('module','commerce_beanstream_payment').'/includes/commerce_beanstream.api.inc');
-require_once(drupal_get_path('module','commerce_beanstream_payment').'/includes/commerce_beanstream.cardonfile.callbacks.inc');
+require_once(drupal_get_path('module','commerce_beanstream').'/includes/commerce_beanstream.api.inc');
+require_once(drupal_get_path('module','commerce_beanstream').'/includes/commerce_beanstream.cardonfile.callbacks.inc');
 
 /**
  * Implements hook_commerce_payment_method_info().
  */
-function commerce_beanstream_payment_commerce_payment_method_info() {
+function commerce_beanstream_commerce_payment_method_info() {
   $payment_methods = array();
 
-  $payment_methods['commerce_beanstream_payment'] = array(
+  $payment_methods['commerce_beanstream'] = array(
     'active' => TRUE,
     'title' => t('Beanstream Payment Method'),
     'short_title' => t('Beanstream'),
@@ -34,7 +34,7 @@ function commerce_beanstream_payment_commerce_payment_method_info() {
  *
  * @return array Menu item for voiding payments (not fully implemented)
  */
-function commerce_beanstream_payment_menu() {
+function commerce_beanstream_menu() {
   $items = array();
   /** Creates a menu for voiding transactions. */
   $items['admin/commerce/orders/%commerce_order/payment/%commerce_payment_transaction/beanstream-void'] = array(
@@ -60,7 +60,7 @@ function commerce_beanstream_payment_menu() {
  * @return bool TRUE if access is granted.
  */
 function commerce_beanstream_void_access($order, $transaction) {
-  if ($transaction->payment_method != 'commerce_beanstream_payment' || empty($transaction->remote_id)){
+  if ($transaction->payment_method != 'commerce_beanstream' || empty($transaction->remote_id)){
     //||!in_array(strtoupper($transaction->remote_status), array('AUTH_ONLY', 'PRIOR_AUTH_CAPTURE', 'AUTH_CAPTURE'))) {
     return FALSE;
   }
@@ -86,7 +86,7 @@ function commerce_beanstream_void_access($order, $transaction) {
  * @param $order Object order object
  * @return Array of form fields
  */
-function commerce_beanstream_payment_submit_form($payment_method, $pane_values, $checkout_pane, $order) {
+function commerce_beanstream_submit_form($payment_method, $pane_values, $checkout_pane, $order) {
   module_load_include('inc', 'commerce_payment', 'includes/commerce_payment.credit_card');
   // Prepare the fields to include on the credit card form.
   $fields = array(
@@ -114,7 +114,7 @@ function commerce_beanstream_payment_submit_form($payment_method, $pane_values, 
  * @param array $form_parents
  * @return bool TRUE if the payment validates
  */
-function commerce_beanstream_payment_submit_form_validate($payment_method, $pane_form, $pane_values, $order, $form_parents = array()) {
+function commerce_beanstream_submit_form_validate($payment_method, $pane_form, $pane_values, $order, $form_parents = array()) {
   // If the customer specified a card on file, skip the normal validation.
   if (module_exists('commerce_cardonfile') && !empty($payment_method['settings']['cardonfile']) &&
     !empty($pane_values['cardonfile']) && $pane_values['cardonfile'] !== 'new') {
@@ -144,7 +144,7 @@ function commerce_beanstream_payment_submit_form_validate($payment_method, $pane
  * @param $charge Array detailing amount and currency of transaction
  * @return bool TRUE if transaction was successful, FALSE otherwise
  */
-function commerce_beanstream_payment_submit_form_submit($payment_method, $pane_form, $pane_values, $order, $charge) {
+function commerce_beanstream_submit_form_submit($payment_method, $pane_form, $pane_values, $order, $charge) {
   // Get billing address
   $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
   if( isset($order_wrapper->commerce_customer_billing) ) {
@@ -165,7 +165,7 @@ function commerce_beanstream_payment_submit_form_submit($payment_method, $pane_f
     if ($pane_values['cardonfile'] === 'new') {
 
       # make the request here..
-      $card = commerce_beanstream_payment_create_profile($payment_method, $order, $pane_form, $pane_values, $billing);
+      $card = commerce_beanstream_create_profile($payment_method, $order, $pane_form, $pane_values, $billing);
 
       if (!empty($card)) {
         # Run the transaction
@@ -190,9 +190,9 @@ function commerce_beanstream_payment_submit_form_submit($payment_method, $pane_f
   // No Card on File.
   } else {
 
-    $order->data['commerce_beanstream_payment'] = $pane_values;
+    $order->data['commerce_beanstream'] = $pane_values;
 
-    $result = commerce_beanstream_payment_transaction($payment_method, $order, $charge, $pane_values);
+    $result = commerce_beanstream_transaction($payment_method, $order, $charge, $pane_values);
     // if $result is equal to FALSE, the credit card has been declined - stop checkout and give user msg
     if($result == FALSE) {
       return FALSE;
@@ -228,7 +228,7 @@ function commerce_beanstream_default_settings() {
  * @param null $settings Array of settings to configure
  * @return array Form fields to configure payment method instance.
  */
-function commerce_beanstream_payment_settings_form($settings = NULL) {
+function commerce_beanstream_settings_form($settings = NULL) {
   module_load_include('inc', 'commerce_payment', 'includes/commerce_payment.credit_card');
 
   // Merge default settings into the stored settings array.

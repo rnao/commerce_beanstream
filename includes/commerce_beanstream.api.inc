@@ -13,7 +13,7 @@ define('COMMERCE_BEANSTREAM_PAYMENT_PROFILE_URL', 'https://www.beanstream.com/sc
  * @param $billing Object billing profile entity wrapper
  * @return Object|bool The card object if created successfully, FALSE otherwise.
  */
-function commerce_beanstream_payment_create_profile($payment_method, $order, $pane_form, $pane_values, $billing) {
+function commerce_beanstream_create_profile($payment_method, $order, $pane_form, $pane_values, $billing) {
   // Determine the credit card type if possible for use in later code.
   if (!empty($pane_values['credit_card']['number'])) {
     module_load_include('inc', 'commerce_payment', 'includes/commerce_payment.credit_card');
@@ -63,7 +63,7 @@ function commerce_beanstream_payment_create_profile($payment_method, $order, $pa
   if( isset($u->mail) ) { $data['ordEmailAddress'] = $u->mail; }
 
   # Make the API request and check response
-  $result = _commerce_beanstream_payment_profile_request('N', $payment_method, $data);
+  $result = _commerce_beanstream_profile_request('N', $payment_method, $data);
   if (empty($result) || $result['responseCode'] !== "1") {
     $error = array(
       '@code' => $result['responseCode'],
@@ -75,7 +75,7 @@ function commerce_beanstream_payment_create_profile($payment_method, $order, $pa
       if (isset($result['matchedCustomerCode'])) {
 
         $data['customerCode'] = $result['matchedCustomerCode'];
-        $card_result = _commerce_beanstream_payment_profile_request('ADD_CARD', $payment_method, $data);
+        $card_result = _commerce_beanstream_profile_request('ADD_CARD', $payment_method, $data);
 
         if (!empty($card_result) && $card_result['responseCode'] === "1") {
           $card->card_number = substr($pane_values['credit_card']['number'], -4);
@@ -121,9 +121,9 @@ function commerce_beanstream_payment_create_profile($payment_method, $order, $pa
  *   Array of pane values entered on the submission form.
  * @return bool $transaction Object
  */
-function commerce_beanstream_payment_transaction($payment_method, $order, $charge, $pane_values){
+function commerce_beanstream_transaction($payment_method, $order, $charge, $pane_values){
   //transaction info
-  $transaction = commerce_payment_transaction_new('commerce_beanstream_payment', $order->order_id);
+  $transaction = commerce_payment_transaction_new('commerce_beanstream', $order->order_id);
   $transaction->instance_id = $payment_method['instance_id'];
   $transaction->amount = $charge['amount'];
   $transaction->currency_code = $charge['currency_code'];
@@ -316,7 +316,7 @@ function _commerce_beanstream_transaction_request($payment_method, $request){
      'responseFormat' => 'QS', // QueryString format responses
     );
 
-  $result = _commerce_beanstream_payment_curl($beanstream_url, $request);
+  $result = _commerce_beanstream_curl($beanstream_url, $request);
 
   //parse response string into variables
   parse_str($result, $response);
@@ -332,7 +332,7 @@ function _commerce_beanstream_transaction_request($payment_method, $request){
  * @param $data Array data elements to pass to Beanstream Payment Profile API
  * @return Array parsed payment profile response
  */
-function _commerce_beanstream_payment_profile_request($op, $payment_method, $data) {
+function _commerce_beanstream_profile_request($op, $payment_method, $data) {
   $beanstream_url = $payment_method['settings']['payment_profile_url'];
 
   $data += array(
@@ -343,7 +343,7 @@ function _commerce_beanstream_payment_profile_request($op, $payment_method, $dat
     'responseFormat' => 'QS', // QueryString format responses
   );
 
-  $result = _commerce_beanstream_payment_curl($beanstream_url, $data);
+  $result = _commerce_beanstream_curl($beanstream_url, $data);
 
   //parse response string into variables
   parse_str($result, $response);
@@ -359,7 +359,7 @@ function _commerce_beanstream_payment_profile_request($op, $payment_method, $dat
  * @param $data Array data elements to pass to Beanstream Payment Profile API
  * @return Object SimpleXML object result of Payment Profile request
  */
-function _commerce_beanstream_payment_profile_request_xml($op, $payment_method, $data) {
+function _commerce_beanstream_profile_request_xml($op, $payment_method, $data) {
   $beanstream_url = $payment_method['settings']['payment_profile_url'];
 
   $data += array(
@@ -370,7 +370,7 @@ function _commerce_beanstream_payment_profile_request_xml($op, $payment_method, 
     'responseFormat' => 'XML', // QueryString format responses
   );
 
-  $result = _commerce_beanstream_payment_curl($beanstream_url, $data);
+  $result = _commerce_beanstream_curl($beanstream_url, $data);
 
   return simplexml_load_string($result);
 }
@@ -382,7 +382,7 @@ function _commerce_beanstream_payment_profile_request_xml($op, $payment_method, 
  * @param array $data
  * @return bool|mixed Result of the transaction, or FALSE on error.
  */
-function _commerce_beanstream_payment_curl($url, $data) {
+function _commerce_beanstream_curl($url, $data) {
 
   $ch = curl_init();                           // Initialize curl
   curl_setopt( $ch, CURLOPT_POST, 1 );         // Get curl to POST

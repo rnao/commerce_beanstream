@@ -46,7 +46,7 @@ function commerce_beanstream_cardonfile_charge($payment_method, $card_data, $ord
   }
 
   //transaction info
-  $transaction = commerce_payment_transaction_new('commerce_beanstream_payment', $order->order_id);
+  $transaction = commerce_payment_transaction_new('commerce_beanstream', $order->order_id);
   $transaction->instance_id = $payment_method['instance_id'];
   $transaction->amount = $charge['amount'];
   $transaction->currency_code = $charge['currency_code'];
@@ -134,7 +134,7 @@ function commerce_beanstream_cardonfile_update($form, &$form_state, $payment_met
         'trnExpMonth' => $card_data->card_exp_month,
       );
 
-      $result = _commerce_beanstream_payment_profile_request('MODIFY_CARD', $payment_method, $data);
+      $result = _commerce_beanstream_profile_request('MODIFY_CARD', $payment_method, $data);
       if (!empty($result) && $result['responseCode'] === "1") {
         return TRUE;
       } else {
@@ -168,7 +168,7 @@ function commerce_beanstream_cardonfile_delete($form, &$form_state, $payment_met
         'cardId' => $card['cardId'],
       );
 
-      $result = _commerce_beanstream_payment_profile_request_xml('DELETE_CARD', $payment_method, $data);
+      $result = _commerce_beanstream_profile_request_xml('DELETE_CARD', $payment_method, $data);
 
       if (!empty($result) && $result->responseCode == "1") {
         return TRUE;
@@ -198,7 +198,7 @@ function _commerce_beanstream_cardonfile_getcards($payment_method, $code, $order
     $data['trnOrderNumber'] = $orderNum;
   }
 
-  $result = _commerce_beanstream_payment_profile_request_xml('GET_CARDS', $payment_method, $data);
+  $result = _commerce_beanstream_profile_request_xml('GET_CARDS', $payment_method, $data);
 
   if (!empty($result) && $result->responseCode == "1") {
     $cards = array();
