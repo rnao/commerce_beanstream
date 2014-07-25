@@ -147,7 +147,7 @@ function commerce_beanstream_transaction($payment_method, $order, $charge, $pane
     drupal_set_message(t('A billing address must be available to perform a transaction'), 'error');
     return FALSE;
   }
-  array_merge($request, $bill_details);
+  $request = array_merge($request, $bill_details);
 
   //send request
   $response = _commerce_beanstream_transaction_request($payment_method, $request);

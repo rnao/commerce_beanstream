@@ -158,6 +158,7 @@ function commerce_beanstream_submit_form_submit($payment_method, $pane_form, $pa
   // If the customer specified payment using a card on file, attempt that now
   // and simply return the result.
   if (module_exists('commerce_cardonfile') && $payment_method['settings']['cardonfile'] &&
+    $pane_values['credit_card']['cardonfile_store'] == 1 &&
     !empty($pane_values['cardonfile']) && !empty($billing_address)) {
 
 
